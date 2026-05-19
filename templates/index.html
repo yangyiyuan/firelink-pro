@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GBT 26875.3-2011 消防报警数据模拟器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/main.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Noto Sans SC"', 'system-ui', 'sans-serif'],
+                    },
+                    colors: {
+                        jd: {
+                            primary: '#2563EB',
+                            primaryHover: '#1D4ED8',
+                            primaryLight: '#EFF6FF',
+                            primaryBorder: '#BFDBFE',
+                            sidebar: '#F8FAFC',
+                            sidebarActive: '#EFF6FF',
+                            sidebarText: '#475569',
+                            sidebarTextActive: '#2563EB',
+                            header: '#FFFFFF',
+                            content: '#F1F5F9',
+                            card: '#FFFFFF',
+                            cardBorder: '#E2E8F0',
+                            text: '#1E293B',
+                            textSecondary: '#64748B',
+                            textMuted: '#94A3B8',
+                            success: '#10B981',
+                            successLight: '#ECFDF5',
+                            warning: '#F59E0B',
+                            warningLight: '#FFFBEB',
+                            danger: '#EF4444',
+                            dangerLight: '#FEF2F2',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="text-jd-text h-screen overflow-hidden">
+    <div class="flex h-screen" id="appContainer">
+        <!-- Left Sidebar -->
+        <aside id="sidebar" class="w-56 bg-jd-sidebar border-r border-jd-cardBorder flex flex-col shrink-0 transition-all duration-300">
+            <div class="h-14 flex items-center px-4 border-b border-jd-cardBorder justify-between">
+                <div class="flex items-center gap-2.5 overflow-hidden whitespace-nowrap sidebar-brand">
+                    <svg class="w-5 h-5 text-jd-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z"/>
+                    </svg>
+                    <span class="font-semibold text-sm sidebar-text">消防协议模拟器</span>
+                </div>
+            </div>
+            <button id="sidebarToggle" class="w-7 h-7 rounded-lg hover:bg-jd-primaryLight flex items-center justify-center text-jd-textMuted hover:text-jd-primary transition-colors shrink-0" title="收起侧边栏">
+                <svg class="w-4 h-4 transition-transform duration-300" id="toggleIcon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/>
+                </svg>
+            </button>
+            <nav class="flex-1 overflow-y-auto scroll-thin py-3">
+                <div class="px-3 mb-2 sidebar-section-title">
+                    <span class="text-[11px] font-medium text-jd-textMuted uppercase tracking-wider px-3">功能模块</span>
+                </div>
+                <a href="#" class="sidebar-item active flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm font-medium" onclick="PanelModule.showPanel('scene')" title="场景模拟">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                    <span class="sidebar-text">场景模拟</span>
+                </a>
+                <a href="#" class="sidebar-item flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm text-jd-sidebarText" onclick="PanelModule.showPanel('network')" title="网络配置">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
+                    </svg>
+                    <span class="sidebar-text">网络配置</span>
+                </a>
+                <a href="#" class="sidebar-item flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm text-jd-sidebarText" title="发送历史">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span class="sidebar-text">发送历史</span>
+                </a>
+                <a href="#" class="sidebar-item flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm text-jd-sidebarText" title="数据包解析">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    <span class="sidebar-text">数据包解析</span>
+                </a>
+
+                <div class="px-3 mt-4 mb-2 sidebar-section-title">
+                    <span class="text-[11px] font-medium text-jd-textMuted uppercase tracking-wider px-3">系统</span>
+                </div>
+                <a href="#" class="sidebar-item flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm text-jd-sidebarText" title="系统设置">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    <span class="sidebar-text">系统设置</span>
+                </a>
+            </nav>
+            <div class="p-4 border-t border-jd-cardBorder sidebar-footer">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-full bg-jd-primaryLight border border-jd-primaryBorder flex items-center justify-center text-sm font-medium text-jd-primary shrink-0">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                    </div>
+                    <div class="sidebar-footer-text">
+                        <p class="text-sm font-medium text-jd-text">协议模拟器</p>
+                        <p class="text-xs text-jd-textMuted">GBT 26875.3-2011</p>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col min-w-0 bg-jd-content overflow-hidden">
+            <!-- Header -->
+            <div class="h-14 bg-jd-header border-b border-jd-cardBorder flex items-center px-5 justify-between shrink-0">
+                <div class="flex items-center gap-2 text-sm text-jd-textSecondary">
+                    <span class="text-jd-text font-medium" id="mainTitle">场景模拟</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    <span id="breadcrumbScene">单点火灾报警</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span id="connectionStatus" class="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-jd-dangerLight text-jd-danger">
+                        <span class="w-1.5 h-1.5 rounded-full bg-jd-danger"></span>
+                        未连接
+                    </span>
+                </div>
+            </div>
+
+            <!-- Content Area - Scene Panel -->
+            <div id="scenePanel" class="flex-1 flex flex-col overflow-hidden">
+                <!-- Center: Main Panel -->
+                <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+                    <!-- Compact Toolbar -->
+                    <div class="h-14 px-4 border-b border-jd-cardBorder flex items-center justify-between shrink-0 bg-jd-card">
+                        <div class="flex items-center gap-4">
+                            <!-- Scene Select -->
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-jd-textMuted">场景</span>
+                                <select id="sceneSelect" class="jd-input pl-3 py-1 rounded text-xs bg-white" style="width:200px">
+                                </select>
+                            </div>
+                            <div class="w-px h-5 bg-jd-cardBorder"></div>
+                            <!-- Network Config Compact -->
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-jd-textMuted">网络</span>
+                                <select id="networkConfigSelect" class="jd-input pl-3 py-1 rounded text-xs bg-white" style="width:180px">
+                                </select>
+                                <button class="text-xs text-jd-primary hover:text-jd-primaryHover" onclick="PanelModule.showPanel('network')">管理</button>
+                            </div>
+                            <div class="w-px h-5 bg-jd-cardBorder"></div>
+                            <!-- Target Display -->
+                            <div class="flex items-center gap-1.5 text-xs">
+                                <span class="text-jd-textMuted">目标:</span>
+                                <span class="font-mono text-jd-text" id="targetServer">127.0.0.1:8080</span>
+                            </div>
+                            <!-- Connect Button -->
+                            <button id="btnConnect" class="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border transition-colors bg-jd-successLight border-green-200 text-jd-success hover:bg-green-100" onclick="NetworkModule.toggleConnection()">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                </svg>
+                                <span id="btnConnectText">连接</span>
+                            </button>
+                            <div class="w-px h-5 bg-jd-cardBorder"></div>
+                            <!-- Auto Send Controls -->
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-jd-textMuted">自动发送</span>
+                                <select id="autoScene" class="jd-input pl-2 py-1 rounded text-xs bg-white" style="width:120px">
+                                    <option value="random">随机场景</option>
+                                    <option value="single_fire">单点火灾</option>
+                                    <option value="confirmed_fire">确认火警</option>
+                                    <option value="fault">故障报警</option>
+                                    <option value="normal">正常状态</option>
+                                </select>
+                                <span class="text-xs text-jd-textMuted">间隔</span>
+                                <input type="number" id="autoInterval" value="5" min="1" max="3600" class="jd-input px-2 py-1 rounded text-xs bg-white" style="width:60px">
+                                <button class="btn-success flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium" id="btnAutoSend" onclick="AutoSendModule.toggleAutoSend()">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                    <span id="btnAutoSendText">开始</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <div class="flex items-center gap-1.5 text-xs">
+                                <span class="text-jd-textMuted">发送:</span>
+                                <span class="font-semibold text-jd-text" id="totalSent">0</span>
+                            </div>
+                            <div class="w-px h-5 bg-jd-cardBorder"></div>
+                            <div class="flex items-center gap-1.5">
+                                <span id="connectionStatus" class="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-jd-dangerLight text-jd-danger">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-jd-danger"></span>
+                                    未连接
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Main Content: 数据包详情 + 右侧边栏 + 发送历史 -->
+                    <div class="flex-1 flex overflow-hidden">
+                        <!-- Left: 数据包详情 + 发送历史 -->
+                        <div class="flex-1 flex flex-col min-w-0 overflow-hidden px-4 py-4 pr-2">
+                            <!-- 数据包详情 -->
+                            <div class="shrink-0 bg-jd-card rounded-xl border border-jd-cardBorder overflow-hidden mb-3">
+                                <div class="h-12 px-4 border-b border-jd-cardBorder flex items-center justify-between shrink-0">
+                                    <div class="flex items-center gap-2">
+                                        <h3 class="text-sm font-semibold text-jd-text">数据包详情</h3>
+                                        <span class="text-xs px-2 py-0.5 rounded-full bg-jd-primaryLight text-jd-primary" id="currentSceneName">单点火灾报警</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button class="btn-secondary px-3 py-1.5 rounded-md text-xs font-medium" onclick="UtilsModule.copyHex()">复制HEX</button>
+                                        <button class="btn-primary px-3 py-1.5 rounded-md text-xs font-medium" onclick="sendPacket()">发送数据包</button>
+                                    </div>
+                                </div>
+                                <div class="overflow-y-auto scroll-thin p-5" id="packetDetails">
+                                    <div class="flex flex-col items-center justify-center py-12 text-jd-textMuted">
+                                        <svg class="w-12 h-12 mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                        </svg>
+                                        <p class="text-sm">请在上方选择场景生成数据包</p>
+                                        <p class="text-xs mt-1 opacity-60">数据包详情将显示在这里</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 通信记录 -->
+                            <div class="flex-1 bg-jd-card rounded-xl border border-jd-cardBorder flex flex-col min-h-0">
+                                <div class="h-10 px-4 border-b border-jd-cardBorder flex items-center justify-between shrink-0">
+                                    <div class="flex items-center gap-2">
+                                        <h3 class="text-sm font-semibold text-jd-text">通信记录</h3>
+                                        <span class="text-xs text-jd-textMuted" id="historyCount">(0)</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button class="btn-secondary px-3 py-1 rounded-md text-xs" onclick="HistoryModule.loadHistory(true)">刷新</button>
+                                        <button class="btn-secondary px-3 py-1 rounded-md text-xs" onclick="HistoryModule.clearHistory()">清空</button>
+                                    </div>
+                                </div>
+                                <div class="flex-1 overflow-y-auto scroll-thin px-4 py-2" id="historyList">
+                                    <div class="text-center text-jd-textMuted text-sm py-8">暂无收发记录</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right: 场景列表 -->
+                        <div class="w-72 shrink-0 flex flex-col p-4 pl-2">
+                            <div class="bg-jd-card rounded-xl border border-jd-cardBorder flex-1 flex flex-col overflow-hidden">
+                                <!-- 头部 -->
+                                <div class="px-4 py-3 border-b border-jd-cardBorder shrink-0">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <h3 class="text-sm font-semibold text-jd-text">场景列表</h3>
+                                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-jd-primaryLight text-jd-primary font-medium" id="sceneCountBadge">10个场景</span>
+                                    </div>
+                                    <!-- 筛选标签 -->
+                                    <div class="flex items-center gap-1">
+                                        <button class="scene-filter-btn active text-[11px] px-2 py-1 rounded-md transition-all" data-filter="all" onclick="SceneModule.filterScenes('all')">全部</button>
+                                        <button class="scene-filter-btn text-[11px] px-2 py-1 rounded-md transition-all" data-filter="fire" onclick="SceneModule.filterScenes('fire')">
+                                            <span class="inline-block w-1.5 h-1.5 rounded-full bg-red-400 mr-0.5"></span>火警
+                                        </button>
+                                        <button class="scene-filter-btn text-[11px] px-2 py-1 rounded-md transition-all" data-filter="status" onclick="SceneModule.filterScenes('status')">
+                                            <span class="inline-block w-1.5 h-1.5 rounded-full bg-blue-400 mr-0.5"></span>状态
+                                        </button>
+                                        <button class="scene-filter-btn text-[11px] px-2 py-1 rounded-md transition-all" data-filter="tool" onclick="SceneModule.filterScenes('tool')">
+                                            <span class="inline-block w-1.5 h-1.5 rounded-full bg-violet-400 mr-0.5"></span>工具
+                                        </button>
+                                    </div>
+                                </div>
+                                <!-- 场景列表 -->
+                                <div class="flex-1 overflow-y-auto scroll-thin p-3" id="sceneList">
+                                    <!-- 场景列表将由JS动态生成 -->
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- Network Config Panel -->
+            <div id="networkPanel" class="flex-1 overflow-auto p-5 hidden">
+                <div class="flex items-center justify-between mb-5">
+                    <div>
+                        <h2 class="text-lg font-semibold text-jd-text">网络配置管理</h2>
+                        <p class="text-sm text-jd-textMuted mt-1">管理网络目标配置，支持多条配置</p>
+                    </div>
+                    <button class="btn-primary px-4 py-2 rounded-lg text-sm font-medium" onclick="NetworkModule.showAddConfigModal()">添加配置</button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="configList">
+                    <!-- Generated by JS -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Add/Edit Config Modal -->
+    <div id="configModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+        <div class="bg-jd-card rounded-xl border border-jd-cardBorder w-full max-w-md mx-4 overflow-hidden">
+            <div class="h-12 px-4 border-b border-jd-cardBorder flex items-center justify-between">
+                <h3 class="text-sm font-semibold text-jd-text" id="modalTitle">添加网络配置</h3>
+                <button class="w-6 h-6 rounded-lg hover:bg-jd-content flex items-center justify-center text-jd-textMuted hover:text-jd-text" onclick="NetworkModule.closeConfigModal()">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="p-4 space-y-4">
+                <input type="hidden" id="configId">
+                <div>
+                    <label class="block text-xs text-jd-textSecondary mb-1.5">配置名称 *</label>
+                    <input type="text" id="configName" class="jd-input w-full px-3 py-2 rounded-lg text-sm bg-white" placeholder="如：生产服务器">
+                </div>
+                <div>
+                    <label class="block text-xs text-jd-textSecondary mb-1.5">目标主机 *</label>
+                    <input type="text" id="configHostInput" class="jd-input w-full px-3 py-2 rounded-lg text-sm bg-white" placeholder="127.0.0.1">
+                </div>
+                <div>
+                    <label class="block text-xs text-jd-textSecondary mb-1.5">目标端口 *</label>
+                    <input type="number" id="configPortInput" class="jd-input w-full px-3 py-2 rounded-lg text-sm bg-white" placeholder="8080" min="1" max="65535">
+                </div>
+                <div>
+                    <label class="block text-xs text-jd-textSecondary mb-1.5">传输协议</label>
+                    <select id="configProtocolInput" class="jd-input w-full px-3 py-2 rounded-lg text-sm bg-white">
+                        <option value="tcp">TCP</option>
+                        <option value="udp">UDP</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-jd-textSecondary mb-1.5">描述</label>
+                    <textarea id="configDescription" class="jd-input w-full px-3 py-2 rounded-lg text-sm bg-white" rows="2" placeholder="可选的描述信息"></textarea>
+                </div>
+            </div>
+            <div class="px-4 pb-4 flex gap-2">
+                <button class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5" id="btnTestConn" onclick="NetworkModule.testConnection()">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                    <span id="btnTestConnText">测试连接</span>
+                </button>
+                <div class="flex-1"></div>
+                <button class="btn-secondary px-4 py-2 rounded-lg text-sm font-medium" onclick="NetworkModule.closeConfigModal()">取消</button>
+                <button class="btn-primary px-4 py-2 rounded-lg text-sm font-medium" onclick="NetworkModule.saveConfig()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADU 弹窗 -->
+    <div id="aduModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 hidden" onclick="if(event.target===this)HistoryModule.closeAduModal()">
+        <div class="bg-jd-card rounded-xl border border-jd-cardBorder w-full max-w-3xl mx-4 max-h-[80vh] flex flex-col overflow-hidden shadow-xl">
+            <div class="h-12 px-4 border-b border-jd-cardBorder flex items-center justify-between shrink-0">
+                <div class="flex items-center gap-2">
+                    <h3 class="text-sm font-semibold text-jd-text" id="aduModalTitle">应用数据单元</h3>
+                    <span class="text-[11px] px-2 py-0.5 rounded-full bg-jd-primaryLight text-jd-primary" id="aduModalBadge">0 个对象</span>
+                </div>
+                <button class="w-7 h-7 rounded-lg hover:bg-jd-content flex items-center justify-center text-jd-textMuted hover:text-jd-text transition-colors" onclick="HistoryModule.closeAduModal()">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto scroll-thin p-5" id="aduModalContent">
+                <!-- ADU 内容由JS动态生成 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed top-5 right-5 px-5 py-3 rounded-lg text-white text-sm font-medium shadow-lg transition-all duration-300 z-50" style="transform: translateX(calc(100% + 20px)); opacity: 0;"></div>
+
+    <!-- JS Modules -->
+    <script src="/static/js/customSelect.js"></script>
+    <script src="/static/js/scene.js"></script>
+    <script src="/static/js/network.js"></script>
+    <script src="/static/js/autoSend.js"></script>
+    <script src="/static/js/history.js"></script>
+    <script src="/static/js/stats.js"></script>
+    <script src="/static/js/panel.js"></script>
+    <script src="/static/js/utils.js"></script>
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
