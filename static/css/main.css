@@ -29,6 +29,13 @@ body { background: #F1F5F9; }
     position: relative;
     display: inline-block;
 }
+.jd-select-wrapper.is-full {
+    display: block;
+    width: 100%;
+}
+.jd-select-wrapper.is-full .jd-select-trigger {
+    width: 100%;
+}
 .jd-select-wrapper select.jd-input {
     display: none;
 }
@@ -252,6 +259,113 @@ body { background: #F1F5F9; }
     background: #EFF6FF;
     color: #2563EB;
     border-color: #BFDBFE;
+}
+
+/* Flatpickr Theme Override - 与 jd-input 设计系统统一 */
+.flatpickr-calendar {
+    font-family: 'Noto Sans SC', system-ui, sans-serif !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 10px !important;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06) !important;
+    width: 280px !important;
+}
+.flatpickr-months {
+    padding: 6px 4px !important;
+}
+.flatpickr-month {
+    color: #1E293B !important;
+    font-weight: 600 !important;
+    fill: #1E293B !important;
+}
+.flatpickr-current-month .cur-month {
+    font-weight: 600 !important;
+}
+.flatpickr-day {
+    border-radius: 6px !important;
+    color: #334155 !important;
+    font-weight: 400 !important;
+    transition: all 0.15s ease !important;
+}
+.flatpickr-day:hover {
+    background: #F1F5F9 !important;
+    border-color: #F1F5F9 !important;
+    color: #1E293B !important;
+}
+.flatpickr-day.selected,
+.flatpickr-day.startRange,
+.flatpickr-day.endRange,
+.flatpickr-day.selected.inRange {
+    background: #2563EB !important;
+    border-color: #2563EB !important;
+    color: #fff !important;
+}
+.flatpickr-day.selected:hover {
+    background: #1D4ED8 !important;
+}
+.flatpickr-day.inRange {
+    background: #EFF6FF !important;
+    border-color: #EFF6FF !important;
+    color: #1E293B !important;
+}
+.flatpickr-day.prevMonthDay,
+.flatpickr-day.nextMonthDay {
+    color: #94A3B8 !important;
+}
+.flatpickr-day.today {
+    border-color: #2563EB !important;
+    color: #2563EB !important;
+    font-weight: 500 !important;
+}
+.flatpickr-day.today.selected {
+    color: #fff !important;
+}
+span.flatpickr-weekday {
+    color: #64748B !important;
+    font-weight: 500 !important;
+    font-size: 12px !important;
+}
+.flatpickr-time input {
+    font-family: 'Noto Sans SC', system-ui, sans-serif !important;
+    color: #1E293B !important;
+}
+.flatpickr-time .flatpickr-time-separator,
+.flatpickr-time input ~ span {
+    color: #64748B !important;
+}
+.flatpickr-am-pm {
+    color: #64748B !important;
+}
+.flatpickr-input.fp-datetime {
+    cursor: pointer !important;
+}
+.flatpickr-input.fp-datetime:disabled {
+    background: #F8FAFC !important;
+    color: #94A3B8 !important;
+    cursor: not-allowed !important;
+    border-color: #F1F5F9 !important;
+}
+.flatpickr-monthDropdown-months {
+    font-weight: 500 !important;
+    color: #1E293B !important;
+}
+.flatpickr-months .flatpickr-prev-month,
+.flatpickr-months .flatpickr-next-month {
+    fill: #94A3B8 !important;
+    color: #94A3B8 !important;
+    transition: all 0.15s ease !important;
+}
+.flatpickr-months .flatpickr-prev-month:hover,
+.flatpickr-months .flatpickr-next-month:hover {
+    fill: #2563EB !important;
+    color: #2563EB !important;
+}
+.flatpickr-calendar.arrowTop::before,
+.flatpickr-calendar.arrowTop::after {
+    border-bottom-color: #E2E8F0 !important;
+}
+.flatpickr-calendar.arrowBottom::before,
+.flatpickr-calendar.arrowBottom::after {
+    border-top-color: #E2E8F0 !important;
 }
 
 /* Scene Group Header */

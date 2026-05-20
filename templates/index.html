@@ -10,6 +10,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/themes/airbnb.css">
     <script>
         tailwind.config = {
             theme: {
@@ -69,13 +71,13 @@
                 <div class="px-3 mb-2 sidebar-section-title">
                     <span class="text-[11px] font-medium text-jd-textMuted uppercase tracking-wider px-3">功能模块</span>
                 </div>
-                <a href="#" class="sidebar-item active flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm font-medium" onclick="PanelModule.showPanel('scene')" title="场景模拟">
+                <a href="#" id="sidebarSceneLink" class="sidebar-item active flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm font-medium" onclick="PanelModule.showPanel('scene')" title="场景模拟">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
                     </svg>
                     <span class="sidebar-text">场景模拟</span>
                 </a>
-                <a href="#" class="sidebar-item flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm text-jd-sidebarText" onclick="PanelModule.showPanel('network')" title="网络配置">
+                <a href="#" id="sidebarNetworkLink" class="sidebar-item flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm text-jd-sidebarText" onclick="PanelModule.showPanel('network')" title="网络配置">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
                     </svg>
@@ -92,6 +94,12 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                     </svg>
                     <span class="sidebar-text">数据包解析</span>
+                </a>
+                <a href="#" id="sidebarAutoSceneLink" class="sidebar-item flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm text-jd-sidebarText" onclick="PanelModule.showPanel('autoScene')" title="场景编排">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5h10M9 12h10M9 19h10M5 5h.01M5 12h.01M5 19h.01"/>
+                    </svg>
+                    <span class="sidebar-text">场景编排</span>
                 </a>
 
                 <div class="px-3 mt-4 mb-2 sidebar-section-title">
@@ -144,13 +152,6 @@
                     <!-- Compact Toolbar -->
                     <div class="h-14 px-4 border-b border-jd-cardBorder flex items-center justify-between shrink-0 bg-jd-card">
                         <div class="flex items-center gap-4">
-                            <!-- Scene Select -->
-                            <div class="flex items-center gap-2">
-                                <span class="text-xs text-jd-textMuted">场景</span>
-                                <select id="sceneSelect" class="jd-input pl-3 py-1 rounded text-xs bg-white" style="width:200px">
-                                </select>
-                            </div>
-                            <div class="w-px h-5 bg-jd-cardBorder"></div>
                             <!-- Network Config Compact -->
                             <div class="flex items-center gap-2">
                                 <span class="text-xs text-jd-textMuted">网络</span>
@@ -173,17 +174,9 @@
                             </button>
                             <div class="w-px h-5 bg-jd-cardBorder"></div>
                             <!-- Auto Send Controls -->
-                            <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-2 min-w-0">
                                 <span class="text-xs text-jd-textMuted">自动发送</span>
-                                <select id="autoScene" class="jd-input pl-2 py-1 rounded text-xs bg-white" style="width:120px">
-                                    <option value="random">随机场景</option>
-                                    <option value="single_fire">单点火灾</option>
-                                    <option value="confirmed_fire">确认火警</option>
-                                    <option value="fault">故障报警</option>
-                                    <option value="normal">正常状态</option>
-                                </select>
-                                <span class="text-xs text-jd-textMuted">间隔</span>
-                                <input type="number" id="autoInterval" value="5" min="1" max="3600" class="jd-input px-2 py-1 rounded text-xs bg-white" style="width:60px">
+                                <select id="autoSceneSummary" class="jd-input pl-3 py-1 rounded text-xs bg-white" style="width:180px"></select>
                                 <button class="btn-success flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium" id="btnAutoSend" onclick="AutoSendModule.toggleAutoSend()">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
@@ -191,6 +184,8 @@
                                     </svg>
                                     <span id="btnAutoSendText">开始</span>
                                 </button>
+                                <span id="autoRunStatus" class="text-[11px] px-2 py-1 rounded-full bg-slate-100 text-jd-textMuted">空闲</span>
+                                <button class="text-xs text-jd-primary hover:text-jd-primaryHover" id="btnAutoSceneConfig" onclick="AutoSendModule.openConfigModal()">进入编排</button>
                             </div>
                         </div>
                         <div class="flex items-center gap-3">
@@ -300,6 +295,104 @@
                     <!-- Generated by JS -->
                 </div>
             </div>
+
+            <div id="autoScenePanel" class="flex-1 overflow-hidden p-5 hidden">
+                <div class="bg-jd-card rounded-xl border border-jd-cardBorder h-full flex flex-col overflow-hidden shadow-sm">
+                    <div class="h-14 px-5 border-b border-jd-cardBorder flex items-center justify-between shrink-0">
+                        <div class="min-w-0 flex items-center gap-2">
+                            <h2 class="text-base font-semibold text-jd-text">自动发送场景编排</h2>
+                            <p class="text-xs text-jd-textMuted">按模板、步骤和信息对象配置自动发送任务</p>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <button class="btn-secondary px-3 py-1.5 rounded-lg text-xs font-medium" onclick="AutoSendModule.createBlankScene()">新建</button>
+                            <button class="btn-secondary px-3 py-1.5 rounded-lg text-xs font-medium" onclick="AutoSendModule.previewCurrentScene()">预览</button>
+                            <button id="btnSaveTemplate" class="btn-secondary px-3 py-1.5 rounded-lg text-xs font-medium" onclick="AutoSendModule.saveTemplate()">保存模板</button>
+                        </div>
+                    </div>
+                    <div class="flex-1 min-h-0 grid grid-cols-[280px_minmax(0,1fr)]" id="autoSceneGridLayout">
+                        <aside class="border-r border-jd-cardBorder bg-jd-content/50 flex flex-col min-h-0 overflow-hidden" id="autoTemplateAside" style="width:280px;min-width:280px;">
+                            <div class="p-4 border-b border-jd-cardBorder space-y-3 shrink-0">
+                                <div class="flex items-center gap-1.5">
+                                        <h4 class="text-sm font-semibold text-jd-text">模板</h4>
+                                        <p class="text-xs text-jd-textMuted">系统模板与本地模板</p>
+                                    </div>
+                                <input id="autoTemplateSearch" type="text" class="jd-input w-full px-3 py-2 rounded-lg text-sm bg-white" placeholder="搜索模板..." oninput="AutoSendModule.filterTemplates(this.value)">
+                            </div>
+                            <div id="autoTemplateList" class="flex-1 overflow-y-auto scroll-thin p-3 space-y-2">
+                                <div class="text-center text-jd-textMuted text-sm py-8">加载模板中...</div>
+                            </div>
+                        </aside>
+                        <section class="min-w-0 flex flex-col min-h-0">
+                            <div class="grid grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] flex-1 min-h-0">
+                                <div class="border-r border-jd-cardBorder min-h-0 flex flex-col">
+                                    <div class="p-4 border-b border-jd-cardBorder space-y-4 shrink-0">
+                                        <div class="grid grid-cols-3 gap-3">
+                                            <div>
+                                                <label class="block text-xs text-jd-textSecondary mb-1.5">场景名称</label>
+                                                <input id="autoSceneNameInput" type="text" class="jd-input w-full px-3 py-2 rounded-lg text-sm bg-white" placeholder="请输入场景名称" oninput="AutoSendModule.updateSceneField('name', this.value)">
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs text-jd-textSecondary mb-1.5">分类</label>
+                                                <select id="autoSceneCategoryInput" class="jd-input w-full px-3 py-2 rounded-lg text-sm bg-white" onchange="AutoSendModule.updateSceneField('category', this.value)">
+                                                    <option value="fire">火警报警</option>
+                                                    <option value="fault">故障报警</option>
+                                                    <option value="restore">状态恢复</option>
+                                                    <option value="linkage">联动控制</option>
+                                                    <option value="supervise">监管报警</option>
+                                                    <option value="analog">模拟量监控</option>
+                                                    <option value="device">传输装置</option>
+                                                    <option value="shield">屏蔽管理</option>
+                                                    <option value="sequence">序列场景</option>
+                                                    <option value="custom">自定义</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs text-jd-textSecondary mb-1.5">循环执行</label>
+                                                <label class="flex items-center gap-2 h-[38px] px-3 rounded-lg border border-jd-cardBorder bg-white text-sm text-jd-text">
+                                                    <input id="autoSceneLoopInput" type="checkbox" class="rounded border-jd-cardBorder" onchange="AutoSendModule.updateSceneField('loop', this.checked)">
+                                                    <span>场景完成后继续循环</span>
+                                                </label>
+                                            </div>
+                                            <div class="col-span-3">
+                                                <label class="block text-xs text-jd-textSecondary mb-1.5">描述</label>
+                                                <textarea id="autoSceneDescriptionInput" class="jd-input w-full px-3 py-2 rounded-lg text-sm bg-white" rows="1" placeholder="描述当前场景用途" oninput="AutoSendModule.updateSceneField('description', this.value)"></textarea>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <div>
+                                                <h4 class="text-sm font-semibold text-jd-text inline">执行步骤</h4>
+                                                <p class="text-xs text-jd-textMuted ml-1.5 inline">每个步骤会生成 1 个完整协议包</p>
+                                            </div>
+                                            <button id="btnAddStep" class="btn-primary px-3 py-1.5 rounded-lg text-xs font-medium" onclick="AutoSendModule.addStep()">新增步骤</button>
+                                        </div>
+                                    </div>
+                                    <div id="autoSceneSteps" class="flex-1 overflow-y-auto scroll-thin p-4 space-y-4">
+                                        <div class="text-center text-jd-textMuted text-sm py-8">暂无步骤</div>
+                                    </div>
+                                </div>
+                                <div class="min-h-0 flex flex-col">
+                                    <div class="p-4 border-b border-jd-cardBorder shrink-0">
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center gap-1.5">
+                                                <h4 class="text-sm font-semibold text-jd-text">预览与运行</h4>
+                                                <p class="text-xs text-jd-textMuted">预览按真实构包链路生成</p>
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                <span id="autoScenePreviewStatus" class="text-[11px] px-2 py-1 rounded-full bg-slate-100 text-jd-textMuted">未预览</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="flex-1 overflow-y-auto scroll-thin p-4 space-y-4" id="autoScenePreviewPanel">
+                                        <div class="rounded-xl border border-dashed border-jd-cardBorder bg-jd-content/50 px-4 py-10 text-center text-sm text-jd-textMuted">
+                                            点击“预览”查看每个步骤生成的数据包
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 
@@ -372,6 +465,10 @@
 
     <!-- Toast -->
     <div id="toast" class="fixed top-5 right-5 px-5 py-3 rounded-lg text-white text-sm font-medium shadow-lg transition-all duration-300 z-50" style="transform: translateX(calc(100% + 20px)); opacity: 0;"></div>
+
+    <!-- Flatpickr -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/zh.js"></script>
 
     <!-- JS Modules -->
     <script src="/static/js/customSelect.js"></script>

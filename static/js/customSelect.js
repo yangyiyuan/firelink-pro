@@ -6,8 +6,9 @@ const CustomSelect = (function() {
         if (instances.has(selectEl)) return instances.get(selectEl);
 
         const isSm = options.size === 'sm';
+        const isFull = selectEl.classList.contains('w-full');
         const wrapper = document.createElement('div');
-        wrapper.className = 'jd-select-wrapper';
+        wrapper.className = 'jd-select-wrapper' + (isFull ? ' is-full' : '');
         if (options.width) wrapper.style.width = options.width;
 
         const trigger = document.createElement('div');

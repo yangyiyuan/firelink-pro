@@ -22,12 +22,26 @@ try:
         FireAlarmSimulator,
         build_packet_view,
     )
+    from fire_alarm_simulator.services.auto_send_scene import (
+        build_scene_plan,
+        delete_template as delete_auto_scene_template,
+        get_auto_send_meta,
+        list_templates as list_auto_send_templates,
+        save_template as save_auto_scene_template,
+    )
 except ModuleNotFoundError:
     # 兼容在 fire_alarm_simulator 目录下直接执行 `python app.py`
     from protocol.core import (
         SCENE_CATALOG,
         FireAlarmSimulator,
         build_packet_view,
+    )
+    from services.auto_send_scene import (
+        build_scene_plan,
+        delete_template as delete_auto_scene_template,
+        get_auto_send_meta,
+        list_templates as list_auto_send_templates,
+        save_template as save_auto_scene_template,
     )
 
 
@@ -141,9 +155,22 @@ def _save_configs() -> None:
 network_configs, next_config_id = _load_configs()
 target_connection = None
 target_lock = threading.Lock()
+auto_scene_state = {
+    'running': False,
+    'thread': None,
+    'stop_event': None,
+    'run_id': None,
+    'scene_name': None,
+}
+auto_scene_lock = threading.Lock()
+
+
+def new_run_id() -> str:
+    return f'run_{datetime.datetime.now().strftime("%Y%m%d%H%M%S")}_{int(time.time() * 1000) % 1000:03d}'
 
 
 def send_packet_network(packet: bytes, host: str, port: int, protocol: str, extra_fields: dict[str, Any] | None = None) -> dict[str, Any]:
+    print(f'[DEBUG] send_packet_network => host={host}, port={port}, protocol={protocol}, packet_len={len(packet)}')
     try:
         if protocol == 'tcp':
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -170,6 +197,7 @@ def send_packet_network(packet: bytes, host: str, port: int, protocol: str, extr
         if extra_fields:
             result.update(extra_fields)
         record_send_history(result)
+        print(f'[DEBUG] send_packet_network OK => length={len(packet)}, hex_preview={packet.hex()[:40]}...')
         return result
     except Exception as exc:
         error_result = {
@@ -185,6 +213,7 @@ def send_packet_network(packet: bytes, host: str, port: int, protocol: str, extr
         if extra_fields:
             error_result.update(extra_fields)
         record_send_history(error_result)
+        print(f'[DEBUG] send_packet_network FAIL => error={exc}')
         return error_result
 
 
@@ -277,7 +306,15 @@ def _recv_loop(sock: socket.socket, host: str, port: int, protocol: str = 'tcp')
         if target_connection is not None:
             _close_target_connection()
             target_connection = None
+
+    # 连接断开时联动停止正在运行的自动场景
+    with auto_scene_lock:
+        if auto_scene_state['running'] and auto_scene_state['stop_event'] is not None:
+            auto_scene_state['stop_event'].set()
+            print('[DEBUG] 连接断开，已联动停止自动场景')
+
     socketio.emit('target_disconnected', {})
+    print(f'[DEBUG] _recv_loop 退出 => {host}:{port} 连接已断开')
 
 
 @socketio.on('connect')
@@ -363,12 +400,239 @@ def handle_stop_auto_send() -> None:
     emit('auto_send_stopped', {'stats': simulator.stats})
 
 
+@socketio.on('start_auto_scene')
+def handle_start_auto_scene(data: dict[str, Any]) -> None:
+    scene = data.get('scene') or {}
+    network = data.get('network') or {}
+    host = network.get('host', data.get('host', '127.0.0.1'))
+    port = network.get('port', data.get('port', 8080))
+    protocol = network.get('protocol', data.get('protocol', 'tcp'))
+    print(f'[DEBUG] start_auto_scene => scene_name={scene.get("name")}, network={host}:{port}/{protocol}, steps={len(scene.get("steps", []))}')
+
+    with auto_scene_lock:
+        if auto_scene_state['running']:
+            emit('auto_scene_error', {'message': '自动发送场景已在运行中'})
+            emit('error', {'message': '自动发送场景已在运行中'})
+            return
+
+        try:
+            plan = build_scene_plan(scene)
+        except Exception as exc:
+            emit('auto_scene_error', {'message': str(exc)})
+            emit('error', {'message': str(exc)})
+            return
+
+        stop_event = threading.Event()
+        run_id = new_run_id()
+        auto_scene_state.update(
+            {
+                'running': True,
+                'thread': None,
+                'stop_event': stop_event,
+                'run_id': run_id,
+                'scene_name': plan['scene_name'],
+            }
+        )
+
+    def run_auto_scene() -> None:
+        global target_connection
+        cycle_index = 0
+        try:
+            while not stop_event.is_set():
+                cycle_index += 1
+                print(f'[DEBUG] run_auto_scene => cycle={cycle_index}, steps={len(plan["steps"])}, stop={stop_event.is_set()}')
+                for step_index, step in enumerate(plan['steps'], start=1):
+                    if stop_event.is_set():
+                        break
+
+                    # 优先复用已建立的长连接，确保能接收服务器响应
+                    with target_lock:
+                        conn = target_connection
+
+                    target_port = int(port) if port is not None else 0
+                    use_connection = (
+                        conn is not None
+                        and conn.get('host') == host
+                        and conn.get('port') == target_port
+                    )
+                    print(f'[DEBUG] run_auto_scene step={step_index} => use_connection={use_connection}, conn_host={conn.get("host") if conn else None}, conn_port={conn.get("port") if conn else None}, target_host={host}, target_port={target_port}')
+
+                    if use_connection:
+                        # 通过长连接发送，_recv_loop 会自动接收响应
+                        try:
+                            if conn['protocol'] == 'tcp' and conn.get('socket'):
+                                conn['socket'].sendall(step['packet'])
+                            else:
+                                udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                                udp_sock.sendto(step['packet'], (conn['host'], conn['port']))
+                                udp_sock.close()
+                            simulator.stats['total_sent'] += 1
+                            result = {
+                                'success': True,
+                                'length': len(step['packet']),
+                                'hex': step['packet'].hex(),
+                                'host': conn['host'],
+                                'port': conn['port'],
+                                'protocol': conn['protocol'],
+                                'timestamp': now_ms(),
+                                'scene': plan['scene_id'] or plan['scene_name'],
+                                'scene_name': plan['scene_name'],
+                                'mode': 'auto_scene',
+                                'run_id': run_id,
+                                'step_id': step['id'],
+                                'step_name': step['name'],
+                                'step_index': step_index,
+                                'cycle_index': cycle_index,
+                                'template_id': plan['scene_id'],
+                                'via_connection': True,
+                            }
+                            record_send_history(result)
+                        except Exception as exc:
+                            print(f'[DEBUG] 长连接发送失败 => {exc}')
+                            import traceback as _tb
+                            _tb.print_exc()
+                            result = {
+                                'success': False,
+                                'error': str(exc),
+                                'hex': step['packet'].hex(),
+                                'length': len(step['packet']),
+                                'host': host,
+                                'port': int(port),
+                                'protocol': protocol,
+                                'timestamp': now_ms(),
+                                'scene': plan['scene_id'] or plan['scene_name'],
+                                'scene_name': plan['scene_name'],
+                                'mode': 'auto_scene',
+                                'run_id': run_id,
+                                'step_id': step['id'],
+                                'step_name': step['name'],
+                                'step_index': step_index,
+                                'cycle_index': cycle_index,
+                                'template_id': plan['scene_id'],
+                                'via_connection': True,
+                            }
+                            record_send_history(result)
+                            # 长连接断开时清理
+                            with target_lock:
+                                if target_connection is not None:
+                                    _close_target_connection()
+                                    target_connection = None
+                            socketio.emit('target_disconnected', {})
+                    else:
+                        # 无长连接时降级为短连接发送（无法接收响应）
+                        result = send_packet_network(
+                            step['packet'],
+                            host,
+                            int(port),
+                            protocol,
+                            {
+                                'scene': plan['scene_id'] or plan['scene_name'],
+                                'scene_name': plan['scene_name'],
+                                'mode': 'auto_scene',
+                                'run_id': run_id,
+                                'step_id': step['id'],
+                                'step_name': step['name'],
+                                'step_index': step_index,
+                                'cycle_index': cycle_index,
+                                'template_id': plan['scene_id'],
+                            },
+                        )
+                    packet_view = dict(step['packet_view'])
+                    packet_view.update(
+                        {
+                            'run_id': run_id,
+                            'step_id': step['id'],
+                            'step_name': step['name'],
+                            'step_index': step_index,
+                            'cycle_index': cycle_index,
+                        }
+                    )
+                    socketio.emit(
+                        'auto_scene_step_result',
+                        {
+                            **result,
+                            'packet_view': packet_view,
+                            'step_id': step['id'],
+                            'step_name': step['name'],
+                            'step_index': step_index,
+                            'cycle_index': cycle_index,
+                            'scene_name': plan['scene_name'],
+                            'run_id': run_id,
+                        },
+                    )
+                    print(f'[DEBUG] auto_scene_step_result => step={step_index}/{len(plan["steps"])}, cycle={cycle_index}, success={result.get("success")}, hex_len={result.get("length")}, via={"长连接" if result.get("via_connection") else "短连接"}')
+                    if step['delay_after_sec'] > 0:
+                        if stop_event.wait(step['delay_after_sec']):
+                            break
+
+                socketio.emit(
+                    'auto_scene_completed',
+                    {
+                        'run_id': run_id,
+                        'scene_name': plan['scene_name'],
+                        'cycle_index': cycle_index,
+                        'loop': plan['loop'],
+                    },
+                )
+                if stop_event.is_set() or not plan['loop']:
+                    break
+        except Exception as exc:
+            print(f'[DEBUG] run_auto_scene CRASHED => {exc}')
+            import traceback
+            traceback.print_exc()
+            socketio.emit('auto_scene_error', {'message': str(exc), 'run_id': run_id})
+            socketio.emit('error', {'message': str(exc)})
+        finally:
+            with auto_scene_lock:
+                auto_scene_state.update(
+                    {
+                        'running': False,
+                        'thread': None,
+                        'stop_event': None,
+                        'run_id': None,
+                        'scene_name': None,
+                    }
+                )
+            socketio.emit('auto_scene_stopped', {'run_id': run_id, 'scene_name': plan['scene_name']})
+
+    worker = threading.Thread(target=run_auto_scene, daemon=True)
+    with auto_scene_lock:
+        auto_scene_state['thread'] = worker
+    worker.start()
+    emit(
+        'auto_scene_started',
+        {
+            'run_id': run_id,
+            'scene_name': plan['scene_name'],
+            'step_count': len(plan['steps']),
+            'loop': plan['loop'],
+        },
+    )
+    print(f'[DEBUG] auto_scene_started => run_id={run_id}, scene_name={plan["scene_name"]}, steps={len(plan["steps"])}, loop={plan["loop"]}')
+
+
+@socketio.on('stop_auto_scene')
+def handle_stop_auto_scene() -> None:
+    thread = None
+    with auto_scene_lock:
+        stop_event = auto_scene_state['stop_event']
+        thread = auto_scene_state['thread']
+        if not auto_scene_state['running'] or stop_event is None:
+            emit('auto_scene_stopped', {'run_id': None, 'scene_name': ''})
+            return
+        stop_event.set()
+    if thread:
+        thread.join(timeout=2)
+    emit('auto_scene_stopped', {'run_id': auto_scene_state['run_id'], 'scene_name': auto_scene_state['scene_name']})
+
+
 @socketio.on('connect_target')
 def handle_connect_target(data: dict[str, Any]) -> None:
     global target_connection
     host = data.get('host', '127.0.0.1')
     port = int(data.get('port', 8080))
     protocol = data.get('protocol', 'tcp')
+    print(f'[DEBUG] connect_target => host={host}, port={port}, protocol={protocol}')
 
     try:
         with target_lock:
@@ -379,6 +643,14 @@ def handle_connect_target(data: dict[str, Any]) -> None:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.settimeout(5)
                 sock.connect((host, port))
+                # TCP keepalive: 10秒后开始探测，每次间隔3秒，失败3次判定断开
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+                if hasattr(socket, 'TCP_KEEPIDLE'):
+                    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 10)
+                if hasattr(socket, 'TCP_KEEPINTVL'):
+                    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 3)
+                if hasattr(socket, 'TCP_KEEPCNT'):
+                    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3)
                 sock.settimeout(None)
                 recv_thread = threading.Thread(target=_recv_loop, args=(sock, host, port, protocol), daemon=True)
                 recv_thread.start()
@@ -395,10 +667,12 @@ def handle_connect_target(data: dict[str, Any]) -> None:
             }
 
         emit('target_connected', {'host': host, 'port': port, 'protocol': protocol})
+        print(f'[DEBUG] target_connected => host={host}, port={port}, protocol={protocol}')
     except Exception as exc:
         with target_lock:
             target_connection = None
         emit('target_connection_error', {'error': str(exc)})
+        print(f'[DEBUG] target_connection_error => {exc}')
 
 
 @socketio.on('disconnect_target')
@@ -480,6 +754,13 @@ def handle_send_via_connection(data: dict[str, Any]) -> None:
         emit('error', {'message': f'发送失败: {exc}'})
 
 
+@app.route('/api/connection_status')
+def get_connection_status():
+    with target_lock:
+        connected = target_connection is not None
+    return jsonify({'connected': connected})
+
+
 @app.route('/api/test_connection', methods=['POST'])
 def test_connection():
     data = request.get_json()
@@ -531,6 +812,77 @@ def parse_hex():
         return jsonify({'success': False, 'error': str(exc)})
 
 
+@app.route('/api/auto_send/meta')
+def get_auto_send_scene_meta():
+    return jsonify(get_auto_send_meta())
+
+
+@app.route('/api/auto_send/templates', methods=['GET'])
+def get_auto_send_templates():
+    return jsonify(list_auto_send_templates())
+
+
+@app.route('/api/auto_send/templates', methods=['POST'])
+def create_auto_send_template():
+    data = request.get_json() or {}
+    scene = data.get('scene') or data
+    try:
+        template = save_auto_scene_template(scene)
+        return jsonify(template), 201
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 400
+
+
+@app.route('/api/auto_send/templates/<template_id>', methods=['PUT'])
+def update_auto_send_template(template_id: str):
+    data = request.get_json() or {}
+    scene = data.get('scene') or data
+    try:
+        template = save_auto_scene_template(scene, template_id=template_id)
+        return jsonify(template)
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 400
+
+
+@app.route('/api/auto_send/templates/<template_id>', methods=['DELETE'])
+def remove_auto_send_template(template_id: str):
+    if delete_auto_scene_template(template_id):
+        return jsonify({'success': True})
+    return jsonify({'error': '模板不存在或不可删除'}), 404
+
+
+@app.route('/api/auto_send/preview', methods=['POST'])
+def preview_auto_send_scene():
+    data = request.get_json() or {}
+    scene = data.get('scene') or data
+    try:
+        plan = build_scene_plan(scene)
+        steps = [
+            {
+                'id': step['id'],
+                'name': step['name'],
+                'delayAfterSec': step['delay_after_sec'],
+                'typeFlag': step['type_flag'],
+                'command': step['command'],
+                'packetHex': step['packet_hex'],
+                'packetLength': len(step['packet']),
+                'packetView': step['packet_view'],
+                'objectCount': len(step['objects']),
+            }
+            for step in plan['steps']
+        ]
+        return jsonify(
+            {
+                'success': True,
+                'sceneName': plan['scene_name'],
+                'loop': plan['loop'],
+                'steps': steps,
+            }
+        )
+    except Exception as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 400
+
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -543,20 +895,22 @@ def get_scenes():
 
 @app.route('/api/stats')
 def get_stats():
-    return jsonify(
-        {
-            'total_sent': simulator.stats['total_sent'],
-            'running': simulator.running,
-            'start_time': simulator.stats['start_time'],
-            'history_count': len(send_history),
-        }
-    )
+    result = {
+        'total_sent': simulator.stats['total_sent'],
+        'running': simulator.running,
+        'start_time': simulator.stats['start_time'],
+        'history_count': len(send_history),
+    }
+    print(f'[DEBUG] /api/stats => {json.dumps(result, ensure_ascii=False)}')
+    return jsonify(result)
 
 
 @app.route('/api/history')
 def get_history():
     limit = request.args.get('limit', 50, type=int)
-    return jsonify(send_history[-limit:])
+    result = send_history[-limit:]
+    print(f'[DEBUG] /api/history (limit={limit}) => {len(result)} 条记录')
+    return jsonify(result)
 
 
 @app.route('/api/clear_history', methods=['POST'])

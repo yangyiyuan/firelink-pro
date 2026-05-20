@@ -121,7 +121,7 @@ const HistoryModule = (function() {
 
     // ==================== 发送记录 ====================
     function addSent(data) {
-        const sceneName = SceneModule.getSceneName(data.scene);
+        const sceneName = data.scene_name || data.step_name || SceneModule.getSceneName(data.scene);
         const hex = data.hex ? SceneModule.formatHex(data.hex) : '';
         renderItem({
             direction: 'send',
@@ -541,6 +541,7 @@ const HistoryModule = (function() {
                                 <span class="text-sm font-mono font-semibold ${hasAdu ? 'text-jd-primary' : 'text-jd-text'}">${escapeHtml(data.info_count ?? 0)}</span>
                                 ${hasAdu ? '<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-jd-primary/10 text-jd-primary font-medium">查看ADU</span>' : ''}
                             </div>
+                            ${(() => { const _l = (adu?.objects || []).flatMap(o => (o.status_flags || []).filter(f => f.active).map(f => f.on)).slice(0, 3); return _l.length ? `<div class="text-[10px] text-amber-600 mt-1.5 truncate">${_l.map(s => escapeHtml(s)).join(' / ')}</div>` : ''; })()}
                         </div>
                     </div>
                 </section>

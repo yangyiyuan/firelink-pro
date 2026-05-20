@@ -262,36 +262,36 @@ class FireAlarmSimulator:
         return random.randint(1, 0xFFFFFFFF)
 
     def scene_normal(self) -> bytes:
-        adu = self.adu_builder.build_adu(TypeFlag.UP_DEVICE_STATUS, [self.adu_builder.build_device_status(0x00)])
+        adu = self.adu_builder.build_adu(TypeFlag.UP_DEVICE_STATUS, [self.adu_builder.build_device_status(0x01)])
         return self.packet_builder.build_packet(adu)
 
     def scene_single_fire_alarm(self, system_addr: Optional[int] = None) -> bytes:
         system_addr = system_addr or self._generate_random_addr()
-        obj = self.adu_builder.build_component_status(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_PHOTO_SMOKE, self._generate_random_component_addr(), 0x0001, '1号楼3层走廊烟感')
+        obj = self.adu_builder.build_component_status(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_PHOTO_SMOKE, self._generate_random_component_addr(), 0x0002, '1号楼3层走廊烟感')
         adu = self.adu_builder.build_adu(TypeFlag.UP_COMPONENT_STATUS, [obj])
         return self.packet_builder.build_packet(adu)
 
     def scene_confirmed_fire_alarm(self, system_addr: Optional[int] = None) -> bytes:
         system_addr = system_addr or self._generate_random_addr()
         info_objects = [
-            self.adu_builder.build_component_status(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_PHOTO_SMOKE, 0x00010001, 0x0001, 'A区1层大厅烟感01'),
-            self.adu_builder.build_component_status(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_HEAT_DETECTOR, 0x00010002, 0x0001, 'A区1层大厅温感02'),
-            self.adu_builder.build_component_status(SystemType.FIRE_ALARM, system_addr, ComponentType.MANUAL_ALARM_BUTTON, 0x00010003, 0x0001, 'A区1层大厅手报03'),
+            self.adu_builder.build_component_status(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_PHOTO_SMOKE, 0x00010001, 0x0002, 'A区1层大厅烟感01'),
+            self.adu_builder.build_component_status(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_HEAT_DETECTOR, 0x00010002, 0x0002, 'A区1层大厅温感02'),
+            self.adu_builder.build_component_status(SystemType.FIRE_ALARM, system_addr, ComponentType.MANUAL_ALARM_BUTTON, 0x00010003, 0x0002, 'A区1层大厅手报03'),
         ]
         adu = self.adu_builder.build_adu(TypeFlag.UP_COMPONENT_STATUS, info_objects)
         return self.packet_builder.build_packet(adu)
 
     def scene_fault_alarm(self, system_addr: Optional[int] = None) -> bytes:
         system_addr = system_addr or self._generate_random_addr()
-        obj = self.adu_builder.build_component_status(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_PHOTO_SMOKE, self._generate_random_component_addr(), 0x0002, '2号楼5层烟感故障')
+        obj = self.adu_builder.build_component_status(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_PHOTO_SMOKE, self._generate_random_component_addr(), 0x0004, '2号楼5层烟感故障')
         adu = self.adu_builder.build_adu(TypeFlag.UP_COMPONENT_STATUS, [obj])
         return self.packet_builder.build_packet(adu)
 
     def scene_composite_alarm(self, system_addr: Optional[int] = None) -> bytes:
         system_addr = system_addr or self._generate_random_addr()
         info_objects = [
-            self.adu_builder.build_component_status(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_PHOTO_SMOKE, 0x00020001, 0x0001, 'B区2层烟感火警'),
-            self.adu_builder.build_component_status(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_HEAT_DETECTOR, 0x00020002, 0x0002, 'B区2层温感故障'),
+            self.adu_builder.build_component_status(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_PHOTO_SMOKE, 0x00020001, 0x0002, 'B区2层烟感火警'),
+            self.adu_builder.build_component_status(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_HEAT_DETECTOR, 0x00020002, 0x0004, 'B区2层温感故障'),
         ]
         adu = self.adu_builder.build_adu(TypeFlag.UP_COMPONENT_STATUS, info_objects)
         return self.packet_builder.build_packet(adu)
@@ -307,23 +307,23 @@ class FireAlarmSimulator:
 
     def scene_system_fire_alarm(self, system_addr: Optional[int] = None) -> bytes:
         system_addr = system_addr or self._generate_random_addr()
-        obj = self.adu_builder.build_system_status(SystemType.FIRE_ALARM, system_addr, 0x0001)
+        obj = self.adu_builder.build_system_status(SystemType.FIRE_ALARM, system_addr, 0x0002)
         adu = self.adu_builder.build_adu(TypeFlag.UP_SYSTEM_STATUS, [obj])
         return self.packet_builder.build_packet(adu)
 
     def scene_device_fire_status(self) -> bytes:
-        adu = self.adu_builder.build_adu(TypeFlag.UP_DEVICE_STATUS, [self.adu_builder.build_device_status(0x02)])
+        adu = self.adu_builder.build_adu(TypeFlag.UP_DEVICE_STATUS, [self.adu_builder.build_device_status(0x03)])
         return self.packet_builder.build_packet(adu)
 
     def scene_full_fire_scenario(self) -> List[bytes]:
         packets = []
         system_addr = self._generate_random_addr()
-        packets.append(self.packet_builder.build_packet(self.adu_builder.build_adu(TypeFlag.UP_SYSTEM_STATUS, [self.adu_builder.build_system_status(SystemType.FIRE_ALARM, system_addr, 0x0001)])))
-        packets.append(self.packet_builder.build_packet(self.adu_builder.build_adu(TypeFlag.UP_DEVICE_STATUS, [self.adu_builder.build_device_status(0x02)])))
+        packets.append(self.packet_builder.build_packet(self.adu_builder.build_adu(TypeFlag.UP_SYSTEM_STATUS, [self.adu_builder.build_system_status(SystemType.FIRE_ALARM, system_addr, 0x0002)])))
+        packets.append(self.packet_builder.build_packet(self.adu_builder.build_adu(TypeFlag.UP_DEVICE_STATUS, [self.adu_builder.build_device_status(0x03)])))
         packets.append(self.packet_builder.build_packet(self.adu_builder.build_adu(TypeFlag.UP_COMPONENT_STATUS, [
-            self.adu_builder.build_component_status(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_PHOTO_SMOKE, 0x00010001, 0x0001, '探测器1火警'),
-            self.adu_builder.build_component_status(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_PHOTO_SMOKE, 0x00010002, 0x0001, '探测器2火警'),
-            self.adu_builder.build_component_status(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_PHOTO_SMOKE, 0x00010003, 0x0001, '探测器3火警'),
+            self.adu_builder.build_component_status(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_PHOTO_SMOKE, 0x00010001, 0x0002, '探测器1火警'),
+            self.adu_builder.build_component_status(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_PHOTO_SMOKE, 0x00010002, 0x0002, '探测器2火警'),
+            self.adu_builder.build_component_status(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_PHOTO_SMOKE, 0x00010003, 0x0002, '探测器3火警'),
         ])))
         packets.append(self.packet_builder.build_packet(self.adu_builder.build_adu(TypeFlag.UP_ANALOG_VALUE, [
             self.adu_builder.build_analog_value(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_HEAT_DETECTOR, 0x00010001, AnalogType.TEMPERATURE, 920)

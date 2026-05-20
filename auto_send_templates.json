@@ -1,0 +1,111 @@
+{
+  "templates": [
+    {
+      "category": "fire",
+      "description": "单个烟感火警上报",
+      "id": "user_c755a818fd",
+      "loop": true,
+      "name": "单点报警",
+      "source": "user",
+      "steps": [
+        {
+          "delayAfterSec": 5,
+          "id": "step_32d5de2f",
+          "name": "单点火警",
+          "objects": [
+            {
+              "fields": {
+                "bitNo": 1,
+                "componentStatus": 2,
+                "componentType": 42,
+                "description": "1号楼3层走廊烟感",
+                "occurredAt": "",
+                "occurredAtMode": "now",
+                "systemAddr": 1,
+                "systemType": 1,
+                "zoneNo": 1
+              },
+              "id": "obj_67cefd71",
+              "objectType": "component_status"
+            }
+          ],
+          "packetHeader": {
+            "command": 2,
+            "destAddr": "0x000000000002",
+            "sourceAddr": "0x000000000001",
+            "typeFlag": 2
+          }
+        }
+      ],
+      "version": 1
+    },
+    {
+      "category": "sequence",
+      "description": "测试P3 级别火警事件",
+      "id": "user_388e3ea0ab",
+      "loop": false,
+      "name": "P3 火警级别测试",
+      "source": "user",
+      "steps": [
+        {
+          "delayAfterSec": 5,
+          "id": "step_d1bf7fba",
+          "name": "烟感 1 报警",
+          "objects": [
+            {
+              "fields": {
+                "bitNo": 1,
+                "componentStatus": 2,
+                "componentType": 42,
+                "description": "默认烟感火警",
+                "occurredAt": "",
+                "occurredAtMode": "now",
+                "systemAddr": 1,
+                "systemType": 1,
+                "zoneNo": 1
+              },
+              "id": "obj_c57690a7",
+              "objectType": "component_status"
+            }
+          ],
+          "packetHeader": {
+            "command": 2,
+            "destAddr": "0x000000000002",
+            "sourceAddr": "0x000000000001",
+            "typeFlag": 2
+          }
+        },
+        {
+          "delayAfterSec": 5,
+          "id": "step_3c165c78",
+          "name": "烟感 2  报警",
+          "objects": [
+            {
+              "fields": {
+                "bitNo": 2,
+                "componentStatus": 2,
+                "componentType": 42,
+                "description": "",
+                "occurredAt": "",
+                "occurredAtMode": "now",
+                "systemAddr": 1,
+                "systemType": 1,
+                "zoneNo": 1
+              },
+              "id": "obj_6855bbc3",
+              "objectType": "component_status"
+            }
+          ],
+          "packetHeader": {
+            "command": 2,
+            "destAddr": "0x000000000002",
+            "sourceAddr": "0x000000000001",
+            "typeFlag": 2
+          }
+        }
+      ],
+      "version": 1
+    }
+  ],
+  "updated_at": "2026-05-20 13:02:43"
+}

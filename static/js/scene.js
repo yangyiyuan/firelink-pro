@@ -53,15 +53,6 @@ const SceneModule = (function() {
     }
 
     function initSceneList() {
-        const select = document.getElementById('sceneSelect');
-        select.innerHTML = scenes.map(scene => {
-            return `<option value="${scene.id}"${scene.id === currentScene ? ' selected' : ''}>${scene.name}</option>`;
-        }).join('');
-
-        select.addEventListener('change', (e) => {
-            selectScene(e.target.value);
-        });
-
         renderSceneSidebarList();
     }
 
@@ -141,13 +132,6 @@ const SceneModule = (function() {
         const label = document.getElementById('currentSceneName');
         label.textContent = scene.name;
         label.className = 'text-xs px-2 py-0.5 rounded-full bg-jd-primaryLight text-jd-primary';
-
-        const select = document.getElementById('sceneSelect');
-        if (select) {
-            select.value = sceneId;
-            // 同步自定义下拉框显示
-            select.dispatchEvent(new Event('change'));
-        }
 
         // 更新侧边栏场景列表选中状态
         updateSceneSidebarSelection(sceneId);

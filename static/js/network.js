@@ -4,6 +4,7 @@ const NetworkModule = (function() {
     let currentConfigId = null;
     let socket;
     let targetConnected = false;
+    let connectionCheckTimer = null;
 
     function init(socketInstance) {
         socket = socketInstance;
@@ -269,6 +270,7 @@ const NetworkModule = (function() {
             targetConnected = true;
             updateConnectButton('connected');
             updateConnectionStatus(true);
+            startConnectionCheck();
             showToast(`已连接到 ${data.host}:${data.port}`, 'success');
         });
 
@@ -276,6 +278,8 @@ const NetworkModule = (function() {
             targetConnected = false;
             updateConnectButton('disconnected');
             updateConnectionStatus(false);
+            stopConnectionCheck();
+            notifyConnectionLost();
             showToast('已断开连接', 'info');
         });
 
@@ -283,6 +287,7 @@ const NetworkModule = (function() {
             targetConnected = false;
             updateConnectButton('disconnected');
             updateConnectionStatus(false);
+            stopConnectionCheck();
             showToast(`连接失败: ${data.error}`, 'error');
         });
 
@@ -292,9 +297,49 @@ const NetworkModule = (function() {
                 targetConnected = false;
                 updateConnectButton('disconnected');
                 updateConnectionStatus(false);
+                stopConnectionCheck();
+                notifyConnectionLost();
                 showToast(data.message, 'warning');
             }
         });
+    }
+
+    /** 定时向服务端查询连接状态，防止状态不同步 */
+    function startConnectionCheck() {
+        stopConnectionCheck();
+        connectionCheckTimer = setInterval(() => {
+            if (!targetConnected) {
+                stopConnectionCheck();
+                return;
+            }
+            fetch('/api/connection_status')
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.connected && targetConnected) {
+                        targetConnected = false;
+                        updateConnectButton('disconnected');
+                        updateConnectionStatus(false);
+                        stopConnectionCheck();
+                        notifyConnectionLost();
+                        showToast('与服务器的连接已断开', 'warning');
+                    }
+                })
+                .catch(() => {});
+        }, 10000);
+    }
+
+    function stopConnectionCheck() {
+        if (connectionCheckTimer) {
+            clearInterval(connectionCheckTimer);
+            connectionCheckTimer = null;
+        }
+    }
+
+    /** 连接丢失时通知 AutoSendModule */
+    function notifyConnectionLost() {
+        if (typeof AutoSendModule !== 'undefined' && AutoSendModule.isRunning && AutoSendModule.isRunning()) {
+            showToast('连接已断开，自动发送已暂停', 'warning');
+        }
     }
 
     function updateConnectButton(state) {
