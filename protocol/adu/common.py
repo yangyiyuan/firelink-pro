@@ -144,6 +144,41 @@ def parse_operation_objects(reader: ByteReader, info_count: int, bit_defs: List[
     return objects
 
 
+def parse_device_operation_objects(reader: ByteReader, info_count: int, bit_defs: List[Dict[str, str]]) -> List[Dict[str, Any]]:
+    """解析传输装置操作信息（TF=24）
+
+    与TF=4不同，TF=24每个信息对象不含系统类型/系统地址，
+    且在所有信息对象之后，ADU末尾有一个时间标签。
+    """
+    objects = []
+    for idx in range(info_count):
+        op_value = reader.read_u8('操作信息')
+        operator_no = reader.read_u8('操作员编号')
+        occurred_at = reader.read_time('操作记录时间')
+        decoded = decode_flag_bits(op_value, bit_defs, 8)
+        objects.append({
+            'index': idx + 1,
+            'title': f'信息对象 {idx + 1}',
+            'summary': ', '.join(decoded['active_labels']) if decoded['active_labels'] else '无激活操作位',
+            'occurred_at': occurred_at,
+            'fields': [
+                field('操作信息值', f'0x{op_value:02X} / {op_value}', mono=True, accent='primary'),
+                field('操作员编号', operator_no),
+                field('记录时间', occurred_at, mono=True),
+            ],
+            'status_flags': decoded['flags'],
+        })
+    # ADU末尾时间标签
+    if reader.remaining() >= 6:
+        time_tag = reader.read_time('时间标签')
+        for obj in objects:
+            obj['fields'].append(field('时间标签', time_tag, mono=True))
+        # 将时间标签记录到第一个对象的occurred_at（如果尚未设置）
+        if objects and not objects[0].get('occurred_at'):
+            objects[0]['occurred_at'] = time_tag
+    return objects
+
+
 def parse_system_version_objects(reader: ByteReader, info_count: int) -> List[Dict[str, Any]]:
     objects = []
     for idx in range(info_count):
@@ -151,15 +186,18 @@ def parse_system_version_objects(reader: ByteReader, info_count: int) -> List[Di
         system_addr = reader.read_u8('系统地址')
         major = reader.read_u8('主版本号')
         minor = reader.read_u8('次版本号')
+        version_time = reader.read_time('版本时间')
         system_name = safe_name(SYSTEM_TYPE_CN, system_type, '未知系统')
         objects.append({
             'index': idx + 1,
             'title': f'信息对象 {idx + 1}',
             'summary': f'{system_name} / V{major}.{minor}',
+            'occurred_at': version_time,
             'fields': [
                 field('系统类型', f'{system_type} / {system_name}'),
                 field('系统地址', system_addr),
                 field('软件版本', f'V{major}.{minor}', mono=True, accent='primary'),
+                field('版本时间', version_time, mono=True),
             ],
             'status_flags': [],
         })
@@ -173,16 +211,19 @@ def parse_system_config_objects(reader: ByteReader, info_count: int) -> List[Dic
         system_addr = reader.read_u8('系统地址')
         text_len = reader.read_u8('系统说明长度')
         text = reader.read(text_len, '系统配置说明').rstrip(b'\x00').decode('gb18030', errors='ignore').strip()
+        config_time = reader.read_time('配置时间')
         system_name = safe_name(SYSTEM_TYPE_CN, system_type, '未知系统')
         objects.append({
             'index': idx + 1,
             'title': f'信息对象 {idx + 1}',
             'summary': f'{system_name} / 配置说明',
+            'occurred_at': config_time,
             'fields': [
                 field('系统类型', f'{system_type} / {system_name}'),
                 field('系统地址', system_addr),
                 field('说明长度', text_len, mono=True),
                 field('系统配置说明', text or '-'),
+                field('配置时间', config_time, mono=True),
             ],
             'status_flags': [],
         })
@@ -198,18 +239,21 @@ def parse_component_config_objects(reader: ByteReader, info_count: int) -> List[
         component_addr_raw = reader.read(4, '部件地址')
         component_addr = int.from_bytes(component_addr_raw, byteorder='little')
         desc = reader.read(31, '部件说明').rstrip(b'\x00').decode('gb18030', errors='ignore').strip()
+        config_time = reader.read_time('配置时间')
         system_name = safe_name(SYSTEM_TYPE_CN, system_type, '未知系统')
         component_name = safe_name(COMPONENT_TYPE_CN, component_type, '未知部件')
         objects.append({
             'index': idx + 1,
             'title': f'信息对象 {idx + 1}',
             'summary': f'{component_name} / 配置',
+            'occurred_at': config_time,
             'fields': [
                 field('系统类型', f'{system_type} / {system_name}'),
                 field('系统地址', system_addr),
                 field('部件类型', f'{component_type} / {component_name}'),
                 field('部件地址', f'0x{component_addr:08X} / {format_bytes_hex(component_addr_raw)}', mono=True),
                 field('部件说明', desc or '-'),
+                field('配置时间', config_time, mono=True),
             ],
             'status_flags': [],
         })
@@ -222,15 +266,18 @@ def parse_system_time_objects(reader: ByteReader, info_count: int) -> List[Dict[
         system_type = reader.read_u8('系统类型')
         system_addr = reader.read_u8('系统地址')
         system_time = reader.read_time('系统时间')
+        reported_at = reader.read_time('上报时间')
         system_name = safe_name(SYSTEM_TYPE_CN, system_type, '未知系统')
         objects.append({
             'index': idx + 1,
             'title': f'信息对象 {idx + 1}',
             'summary': f'{system_name} / {system_time}',
+            'occurred_at': reported_at,
             'fields': [
                 field('系统类型', f'{system_type} / {system_name}'),
                 field('系统地址', system_addr),
                 field('系统时间', system_time, mono=True, accent='primary'),
+                field('上报时间', reported_at, mono=True),
             ],
             'status_flags': [],
         })
@@ -242,6 +289,7 @@ def parse_device_status_objects(reader: ByteReader, info_count: int, title_prefi
     for idx in range(info_count):
         status = reader.read_u8('装置状态')
         occurred_at = reader.read_time('状态发生时间')
+        time_tag = reader.read_time('时间标签')
         decoded = decode_flag_bits(status, st.DEVICE_STATUS_BITS, 8)
         objects.append({
             'index': idx + 1,
@@ -250,7 +298,8 @@ def parse_device_status_objects(reader: ByteReader, info_count: int, title_prefi
             'occurred_at': occurred_at,
             'fields': [
                 field('状态值', f'0x{status:02X} / {status}', mono=True, accent='primary'),
-                field('状态时间', occurred_at, mono=True),
+                field('状态发生时间', occurred_at, mono=True),
+                field('时间标签', time_tag, mono=True),
             ],
             'status_flags': decoded['flags'],
         })
@@ -262,11 +311,16 @@ def parse_device_version_objects(reader: ByteReader, info_count: int) -> List[Di
     for idx in range(info_count):
         major = reader.read_u8('主版本号')
         minor = reader.read_u8('次版本号')
+        version_time = reader.read_time('版本时间')
         objects.append({
             'index': idx + 1,
             'title': f'信息对象 {idx + 1}',
             'summary': f'传输装置软件版本 / V{major}.{minor}',
-            'fields': [field('软件版本', f'V{major}.{minor}', mono=True, accent='primary')],
+            'occurred_at': version_time,
+            'fields': [
+                field('软件版本', f'V{major}.{minor}', mono=True, accent='primary'),
+                field('版本时间', version_time, mono=True),
+            ],
             'status_flags': [],
         })
     return objects
@@ -277,13 +331,16 @@ def parse_device_config_objects(reader: ByteReader, info_count: int) -> List[Dic
     for idx in range(info_count):
         text_len = reader.read_u8('配置说明长度')
         text = reader.read(text_len, '配置说明').rstrip(b'\x00').decode('gb18030', errors='ignore').strip()
+        config_time = reader.read_time('配置时间')
         objects.append({
             'index': idx + 1,
             'title': f'信息对象 {idx + 1}',
             'summary': '传输装置配置说明',
+            'occurred_at': config_time,
             'fields': [
                 field('说明长度', text_len, mono=True),
                 field('配置说明', text or '-'),
+                field('配置时间', config_time, mono=True),
             ],
             'status_flags': [],
         })

@@ -31,18 +31,17 @@ SCENE_CATALOG = [
     {'id': 'system_status', 'name': '系统状态', 'description': '建筑消防设施系统状态', 'level': 'danger', 'group': 'facility'},
     {'id': 'component_status', 'name': '部件状态', 'description': '部件运行状态（火警/故障/屏蔽/监管/恢复）', 'level': 'warning', 'group': 'facility'},
     {'id': 'analog_value', 'name': '模拟量值', 'description': '部件模拟量值（温度/烟雾/压力）', 'level': 'warning', 'group': 'facility'},
-    {'id': 'operation_info', 'name': '操作信息', 'description': '消防设施操作信息（启动/反馈）', 'level': 'info', 'group': 'facility'},
+    {'id': 'operation_info', 'name': '操作信息', 'description': '消防设施操作信息（复位/消音/确认）', 'level': 'info', 'group': 'facility'},
     {'id': 'system_version', 'name': '软件版本', 'description': '消防设施软件版本信息', 'level': 'info', 'group': 'facility'},
     {'id': 'system_config', 'name': '系统配置', 'description': '消防设施系统配置情况', 'level': 'info', 'group': 'facility'},
+    {'id': 'component_config', 'name': '部件配置', 'description': '消防设施部件配置情况', 'level': 'info', 'group': 'facility'},
     {'id': 'system_time', 'name': '系统时间', 'description': '消防设施系统时间', 'level': 'info', 'group': 'facility'},
     # 传输装置状态 (TF 21~28)
     {'id': 'device_status', 'name': '装置运行状态', 'description': '传输装置运行状态（正常/火警/故障/屏蔽）', 'level': 'info', 'group': 'device'},
     {'id': 'device_operation', 'name': '装置操作信息', 'description': '传输装置操作信息', 'level': 'info', 'group': 'device'},
+    {'id': 'device_version', 'name': '装置软件版本', 'description': '传输装置软件版本信息', 'level': 'info', 'group': 'device'},
     {'id': 'device_config', 'name': '装置配置', 'description': '传输装置配置情况', 'level': 'info', 'group': 'device'},
-    # 确认应答 (TF 134~136)
-    {'id': 'ack_system', 'name': '系统状态确认', 'description': '系统状态确认应答', 'level': 'info', 'group': 'ack'},
-    {'id': 'ack_component', 'name': '部件状态确认', 'description': '部件状态确认应答', 'level': 'info', 'group': 'ack'},
-    {'id': 'ack_device', 'name': '装置状态确认', 'description': '装置运行状态恢复确认', 'level': 'info', 'group': 'ack'},
+    {'id': 'device_time', 'name': '装置系统时间', 'description': '传输装置系统时间', 'level': 'info', 'group': 'device'},
     # 快捷工具
     {'id': 'random', 'name': '随机模板', 'description': '随机生成一种信号', 'level': 'info', 'group': 'tool'},
 ]
@@ -249,8 +248,122 @@ class ADUBuilder:
         return bytes([system_type, system_addr, component_type]) + cls._int_to_bytes(component_addr, 4) + bytes([analog_type]) + cls._int_to_bytes(analog_value, 2, signed=True) + cls._get_time_tag(dt)
 
     @classmethod
-    def build_device_status(cls, status_byte: int, dt: Optional[datetime.datetime] = None) -> bytes:
-        return bytes([status_byte]) + cls._get_time_tag(dt)
+    def build_operation_info(cls, system_type: int, system_addr: int, op_flag: int, operator_no: int, dt: Optional[datetime.datetime] = None) -> bytes:
+        """构建消防设施操作信息对象（TF=4）
+
+        信息对象结构：
+        - 系统类型标志（1字节）
+        - 系统地址（1字节）
+        - 操作标志（1字节）
+        - 操作员编号（1字节）
+        - 时间标签（6字节）
+        """
+        return bytes([system_type, system_addr, op_flag, operator_no]) + cls._get_time_tag(dt)
+
+    @classmethod
+    def build_system_version(cls, system_type: int, system_addr: int, major: int, minor: int, dt: Optional[datetime.datetime] = None) -> bytes:
+        """构建消防设施软件版本信息对象（TF=5）
+
+        信息对象结构：
+        - 系统类型标志（1字节）
+        - 系统地址（1字节）
+        - 主版本号（1字节）
+        - 次版本号（1字节）
+        - 时间标签（6字节）
+        """
+        return bytes([system_type, system_addr, major, minor]) + cls._get_time_tag(dt)
+
+    @classmethod
+    def build_device_version(cls, major: int, minor: int, dt: Optional[datetime.datetime] = None) -> bytes:
+        """构建传输装置软件版本信息对象（TF=25）
+
+        信息对象结构：
+        - 主版本号（1字节）
+        - 次版本号（1字节）
+        - 时间标签（6字节）
+        """
+        return bytes([major, minor]) + cls._get_time_tag(dt)
+
+    @classmethod
+    def build_device_config(cls, text: str, dt: Optional[datetime.datetime] = None) -> bytes:
+        """构建传输装置配置信息对象（TF=26）
+
+        信息对象结构：
+        - 配置说明长度（1字节，L=0~255）
+        - 配置说明（L字节）
+        - 时间标签（6字节）
+
+        信息对象数目限制为 1。
+        """
+        encoded = text.encode('gb18030', errors='ignore')
+        text_len = min(len(encoded), 255)
+        encoded = encoded[:text_len]
+        return bytes([text_len]) + encoded + cls._get_time_tag(dt)
+
+    @classmethod
+    def build_device_status(cls, status_byte: int, occurred_dt: Optional[datetime.datetime] = None, dt: Optional[datetime.datetime] = None) -> bytes:
+        """构建传输装置运行状态信息对象（TF=21）
+
+        信息对象结构：
+        - 状态（1字节）
+        - 状态发生时间（6字节）
+        - 时间标签（6字节）
+        """
+        return bytes([status_byte]) + cls._get_time_tag(occurred_dt) + cls._get_time_tag(dt)
+
+    @classmethod
+    def build_system_config(cls, system_type: int, system_addr: int, text: str, dt: Optional[datetime.datetime] = None) -> bytes:
+        """构建消防设施系统配置信息对象（TF=6）
+
+        信息对象结构：
+        - 系统类型标志（1字节）
+        - 系统地址（1字节）
+        - 系统说明长度（1字节，L=0~255）
+        - 系统配置说明（L字节）
+        - 时间标签（6字节）
+        """
+        encoded = text.encode('gb18030', errors='ignore')
+        text_len = min(len(encoded), 255)
+        encoded = encoded[:text_len]
+        return bytes([system_type, system_addr, text_len]) + encoded + cls._get_time_tag(dt)
+
+    @classmethod
+    def build_component_config(cls, system_type: int, system_addr: int, component_type: int, component_addr: int, component_desc: str = '', dt: Optional[datetime.datetime] = None) -> bytes:
+        """构建消防设施部件配置信息对象（TF=7）
+
+        信息对象结构：
+        - 系统类型标志（1字节）
+        - 系统地址（1字节）
+        - 部件类型（1字节）
+        - 部件地址（4字节）
+        - 部件说明（31字节）
+        - 时间标签（6字节）
+        """
+        return bytes([system_type, system_addr, component_type]) + cls._int_to_bytes(component_addr, 4) + cls._str_to_bytes(component_desc, 31) + cls._get_time_tag(dt)
+
+    @classmethod
+    def build_system_time(cls, system_type: int, system_addr: int, reported_dt: Optional[datetime.datetime] = None, dt: Optional[datetime.datetime] = None) -> bytes:
+        """构建消防设施系统时间信息对象（TF=8）
+
+        信息对象结构：
+        - 系统类型标志（1字节）
+        - 系统地址（1字节）
+        - 建筑消防设施的系统时间（6字节）
+        - 时间标签（6字节）
+        """
+        return bytes([system_type, system_addr]) + cls._get_time_tag(reported_dt) + cls._get_time_tag(dt)
+
+    @classmethod
+    def build_device_time(cls, device_dt: Optional[datetime.datetime] = None, dt: Optional[datetime.datetime] = None) -> bytes:
+        """构建传输装置系统时间信息对象（TF=28）
+
+        信息对象结构：
+        - 用户信息传输装置的系统时间（6字节）
+        - 时间标签（6字节）
+
+        信息对象数目限制为 1。
+        """
+        return cls._get_time_tag(device_dt) + cls._get_time_tag(dt)
 
     @classmethod
     def build_adu(cls, type_flag: int, info_objects: List[bytes]) -> bytes:
@@ -258,6 +371,15 @@ class ADUBuilder:
         for obj in info_objects:
             adu += obj
         return adu
+
+    @classmethod
+    def build_adu_with_time_tag(cls, type_flag: int, info_objects: List[bytes], dt: Optional[datetime.datetime] = None) -> bytes:
+        """构建带ADU末尾时间标签的应用数据单元
+
+        用于TF=24等在所有信息对象之后追加时间标签的协议类型
+        """
+        adu = cls.build_adu(type_flag, info_objects)
+        return adu + cls._get_time_tag(dt)
 
 
 def enrich_packet_parse(parsed: Dict[str, Any]) -> Dict[str, Any]:
@@ -303,6 +425,15 @@ class FireAlarmSimulator:
     def _generate_random_component_addr(self) -> int:
         return random.randint(1, 0xFFFFFFFF)
 
+    def scene_device_status(self) -> bytes:
+        """传输装置运行状态（TF=21）
+
+        模拟装置正常监视状态（bit0=1表示正常运行模式）
+        状态位定义见 standard.DEVICE_STATUS_BITS
+        """
+        adu = self.adu_builder.build_adu(TypeFlag.UP_DEVICE_STATUS, [self.adu_builder.build_device_status(0x01)])
+        return self.packet_builder.build_packet(adu)
+
     def scene_normal(self) -> bytes:
         adu = self.adu_builder.build_adu(TypeFlag.UP_DEVICE_STATUS, [self.adu_builder.build_device_status(0x01)])
         return self.packet_builder.build_packet(adu)
@@ -347,10 +478,122 @@ class FireAlarmSimulator:
         adu = self.adu_builder.build_adu(TypeFlag.UP_ANALOG_VALUE, info_objects)
         return self.packet_builder.build_packet(adu)
 
+    def scene_operation_info(self, system_addr: Optional[int] = None) -> bytes:
+        """消防设施操作信息（TF=4）
+
+        模拟典型操作场景：复位 + 消音 + 确认
+        操作标志位定义见 standard.FACILITY_OPERATION_BITS
+        """
+        system_addr = system_addr or self._generate_random_addr()
+        info_objects = [
+            # 火灾报警系统 - 确认操作（bit5=1 → 0x20）
+            self.adu_builder.build_operation_info(SystemType.FIRE_ALARM, system_addr, 0x20, 1),
+            # 消防联动控制器 - 复位操作（bit0=1 → 0x01）
+            self.adu_builder.build_operation_info(SystemType.FIRE_LINKAGE, system_addr, 0x01, 2),
+            # 火灾报警系统 - 消音操作（bit1=1 → 0x02）
+            self.adu_builder.build_operation_info(SystemType.FIRE_ALARM, system_addr, 0x02, 1),
+        ]
+        adu = self.adu_builder.build_adu(TypeFlag.UP_OPERATION_INFO, info_objects)
+        return self.packet_builder.build_packet(adu)
+
     def scene_system_fire_alarm(self, system_addr: Optional[int] = None) -> bytes:
         system_addr = system_addr or self._generate_random_addr()
         obj = self.adu_builder.build_system_status(SystemType.FIRE_ALARM, system_addr, 0x0002)
         adu = self.adu_builder.build_adu(TypeFlag.UP_SYSTEM_STATUS, [obj])
+        return self.packet_builder.build_packet(adu)
+
+    def scene_system_version(self, system_addr: Optional[int] = None) -> bytes:
+        """消防设施软件版本（TF=5）
+
+        模拟多系统版本上报：火灾报警系统V3.2、消防联动控制器V2.1
+        """
+        system_addr = system_addr or self._generate_random_addr()
+        info_objects = [
+            self.adu_builder.build_system_version(SystemType.FIRE_ALARM, system_addr, 3, 2),
+            self.adu_builder.build_system_version(SystemType.FIRE_LINKAGE, system_addr, 2, 1),
+        ]
+        adu = self.adu_builder.build_adu(TypeFlag.UP_SOFTWARE_VERSION, info_objects)
+        return self.packet_builder.build_packet(adu)
+
+    def scene_device_version(self) -> bytes:
+        """传输装置软件版本（TF=25）"""
+        obj = self.adu_builder.build_device_version(4, 0)
+        adu = self.adu_builder.build_adu(TypeFlag.UP_DEVICE_VERSION, [obj])
+        return self.packet_builder.build_packet(adu)
+
+    def scene_device_config(self) -> bytes:
+        """传输装置配置情况（TF=26）
+
+        模拟典型配置上报：传输装置配置说明
+        信息对象数目限制为 1。
+        """
+        obj = self.adu_builder.build_device_config('JK-GH2013G型用户信息传输装置，支持TCP/UDP通信，3路RS232/RS485接口')
+        adu = self.adu_builder.build_adu(TypeFlag.UP_DEVICE_CONFIG, [obj])
+        return self.packet_builder.build_packet(adu)
+
+    def scene_device_time(self) -> bytes:
+        """传输装置系统时间（TF=28）
+
+        模拟传输装置系统时间上报
+        信息对象结构：用户信息传输装置的系统时间（6字节）+ 时间标签（6字节）
+        信息对象数目限制为 1。
+        """
+        obj = self.adu_builder.build_device_time()
+        adu = self.adu_builder.build_adu(TypeFlag.UP_DEVICE_TIME, [obj])
+        return self.packet_builder.build_packet(adu)
+
+    def scene_system_config(self, system_addr: Optional[int] = None) -> bytes:
+        """消防设施系统配置（TF=6）
+
+        模拟典型配置上报：火灾报警系统和消防联动控制器的配置说明
+        """
+        system_addr = system_addr or self._generate_random_addr()
+        info_objects = [
+            self.adu_builder.build_system_config(SystemType.FIRE_ALARM, system_addr, '1号楼火灾报警控制器，3回路，每回路128点'),
+            self.adu_builder.build_system_config(SystemType.FIRE_LINKAGE, system_addr, 'A区消防联动控制器，16路输入输出'),
+        ]
+        adu = self.adu_builder.build_adu(TypeFlag.UP_SYSTEM_CONFIG, info_objects)
+        return self.packet_builder.build_packet(adu)
+
+    def scene_component_config(self, system_addr: Optional[int] = None) -> bytes:
+        """消防设施部件配置（TF=7）
+
+        模拟典型部件配置上报：烟感和温感探测器的配置说明
+        """
+        system_addr = system_addr or self._generate_random_addr()
+        info_objects = [
+            self.adu_builder.build_component_config(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_PHOTO_SMOKE, 0x00010001, '1号楼3层走廊光电烟感01'),
+            self.adu_builder.build_component_config(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_HEAT_DETECTOR, 0x00010002, '1号楼3层走廊点型温感02'),
+        ]
+        adu = self.adu_builder.build_adu(TypeFlag.UP_COMPONENT_CONFIG, info_objects)
+        return self.packet_builder.build_packet(adu)
+
+    def scene_system_time(self, system_addr: Optional[int] = None) -> bytes:
+        """消防设施系统时间（TF=8）
+
+        模拟多系统时间上报：火灾报警系统和消防联动控制器的系统时间
+        """
+        system_addr = system_addr or self._generate_random_addr()
+        info_objects = [
+            self.adu_builder.build_system_time(SystemType.FIRE_ALARM, system_addr),
+            self.adu_builder.build_system_time(SystemType.FIRE_LINKAGE, system_addr),
+        ]
+        adu = self.adu_builder.build_adu(TypeFlag.UP_SYSTEM_TIME, info_objects)
+        return self.packet_builder.build_packet(adu)
+
+    def scene_device_operation(self) -> bytes:
+        """传输装置操作信息（TF=24）
+
+        模拟典型操作：复位 + 消音，末尾附ADU级时间标签
+        操作标志位定义见 standard.DEVICE_OPERATION_BITS
+        """
+        info_objects = [
+            # 复位操作（bit0=1 → 0x01），操作员3
+            bytes([0x01, 3]) + self.adu_builder._get_time_tag(),
+            # 消音操作（bit1=1 → 0x02），操作员1
+            bytes([0x02, 1]) + self.adu_builder._get_time_tag(),
+        ]
+        adu = self.adu_builder.build_adu_with_time_tag(TypeFlag.UP_DEVICE_OPERATION, info_objects)
         return self.packet_builder.build_packet(adu)
 
     def scene_device_fire_status(self) -> bytes:
@@ -390,18 +633,17 @@ class FireAlarmSimulator:
             'system_status': self.scene_system_fire_alarm,
             'component_status': self.scene_single_fire_alarm,
             'analog_value': self.scene_analog_overlimit,
-            'operation_info': self.scene_composite_alarm,
-            'system_version': self.scene_normal,
-            'system_config': self.scene_normal,
-            'system_time': self.scene_normal,
+            'operation_info': self.scene_operation_info,
+            'system_version': self.scene_system_version,
+            'system_config': self.scene_system_config,
+            'component_config': self.scene_component_config,
+            'system_time': self.scene_system_time,
             # 传输装置状态 (TF 21~28)
-            'device_status': self.scene_normal,
-            'device_operation': self.scene_normal,
-            'device_config': self.scene_normal,
-            # 确认应答 (TF 134~136)
-            'ack_system': self.scene_system_fire_alarm,
-            'ack_component': self.scene_single_fire_alarm,
-            'ack_device': self.scene_normal,
+            'device_status': self.scene_device_status,
+            'device_operation': self.scene_device_operation,
+            'device_version': self.scene_device_version,
+            'device_config': self.scene_device_config,
+            'device_time': self.scene_device_time,
             # 快捷工具
             'random': self.generate_random_scene,
             # 兼容旧ID

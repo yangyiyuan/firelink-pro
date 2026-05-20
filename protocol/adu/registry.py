@@ -10,6 +10,7 @@ from .common import (
     parse_custom_system_time_payload,
     parse_custom_time_payload,
     parse_device_config_objects,
+    parse_device_operation_objects,
     parse_device_status_objects,
     parse_device_time_objects,
     parse_device_version_objects,
@@ -47,6 +48,10 @@ def _operation(bit_defs, include_system: bool) -> Parser:
     return lambda reader, info_count, _type_flag, _type_flag_name: parse_operation_objects(reader, info_count, bit_defs, include_system)
 
 
+def _device_operation(bit_defs) -> Parser:
+    return lambda reader, info_count, _type_flag, _type_flag_name: parse_device_operation_objects(reader, info_count, bit_defs)
+
+
 def _custom_time() -> Parser:
     return lambda reader, info_count, type_flag, type_flag_name: parse_custom_time_payload(reader, info_count, type_flag, type_flag_name)
 
@@ -65,7 +70,7 @@ PARSER_REGISTRY: Dict[int, Parser] = {
     7: _with_info_count(parse_component_config_objects),
     8: _with_info_count(parse_system_time_objects),
     21: _with_info_count(parse_device_status_objects),
-    24: _operation(st.DEVICE_OPERATION_BITS, False),
+    24: _device_operation(st.DEVICE_OPERATION_BITS),
     25: _with_info_count(parse_device_version_objects),
     26: _with_info_count(parse_device_config_objects),
     28: _with_info_count(parse_device_time_objects),

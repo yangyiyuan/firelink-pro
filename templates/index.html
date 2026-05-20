@@ -71,11 +71,11 @@
                 <div class="px-3 mb-2 sidebar-section-title">
                     <span class="text-[11px] font-medium text-jd-textMuted uppercase tracking-wider px-3">功能模块</span>
                 </div>
-                <a href="#" id="sidebarSceneLink" class="sidebar-item active flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm font-medium" onclick="PanelModule.showPanel('scene')" title="信号模板">
+                <a href="#" id="sidebarSceneLink" class="sidebar-item active flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm font-medium" onclick="PanelModule.showPanel('scene')" title="场景模拟">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
                     </svg>
-                    <span class="sidebar-text">信号模板</span>
+                    <span class="sidebar-text">场景模拟</span>
                 </a>
                 <a href="#" id="sidebarNetworkLink" class="sidebar-item flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm text-jd-sidebarText" onclick="PanelModule.showPanel('network')" title="网络配置">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -260,7 +260,7 @@
                                 <div class="px-4 py-3 border-b border-jd-cardBorder shrink-0">
                                     <div class="flex items-center justify-between mb-2">
                                         <h3 class="text-sm font-semibold text-jd-text">信号模板</h3>
-                                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-jd-primaryLight text-jd-primary font-medium" id="sceneCountBadge">14个模板</span>
+                                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-jd-primaryLight text-jd-primary font-medium" id="sceneCountBadge">13个模板</span>
                                     </div>
                                     <!-- 筛选标签 -->
                                     <div class="flex items-center gap-1">
@@ -271,8 +271,8 @@
                                         <button class="scene-filter-btn text-[11px] px-2 py-1 rounded-md transition-all" data-filter="device" onclick="SceneModule.filterScenes('device')">
                                             <span class="inline-block w-1.5 h-1.5 rounded-full bg-blue-400 mr-0.5"></span>装置
                                         </button>
-                                        <button class="scene-filter-btn text-[11px] px-2 py-1 rounded-md transition-all" data-filter="ack" onclick="SceneModule.filterScenes('ack')">
-                                            <span class="inline-block w-1.5 h-1.5 rounded-full bg-green-400 mr-0.5"></span>确认
+                                        <button class="scene-filter-btn text-[11px] px-2 py-1 rounded-md transition-all" data-filter="tool" onclick="SceneModule.filterScenes('tool')">
+                                            <span class="inline-block w-1.5 h-1.5 rounded-full bg-violet-400 mr-0.5"></span>工具
                                         </button>
                                     </div>
                                 </div>
