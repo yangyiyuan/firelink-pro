@@ -584,6 +584,7 @@ def _normalize_step(step: Dict[str, Any], step_index: int, scene_name: str) -> D
         'command': command,
         'source_addr': source_addr,
         'dest_addr': dest_addr,
+        'scene_name': scene_name,
         'objects': normalized_objects,
         'packet': packet,
         'packet_hex': packet.hex(),
@@ -606,4 +607,41 @@ def build_scene_plan(scene: Dict[str, Any]) -> Dict[str, Any]:
         'source': payload.get('source') or 'draft',
         'loop': bool(payload.get('loop', True)),
         'steps': normalized_steps,
+    }
+
+
+def rebuild_step_packet(step: Dict[str, Any]) -> Dict[str, Any]:
+    """重建步骤的数据包（刷新业务流水号和时间标签）
+
+    自动发送场景循环执行时，每次发送前调用此函数重建数据包，
+    使业务流水号从全局 SequenceManager 获取递增值，
+    同时刷新控制单元时间标签和 ADU 内的发生时间（now 模式）。
+    """
+    type_flag = step['type_flag']
+    command = step['command']
+    source_addr = step['source_addr']
+    dest_addr = step['dest_addr']
+    scene_name = step.get('scene_name', '')
+
+    # 重建每个信息对象的字节（occurredAtMode='now' 时取当前时间）
+    object_bytes = []
+    for obj_index, obj in enumerate(step.get('objects', [])):
+        object_bytes.append(
+            _build_object_bytes(obj['objectType'], obj['fields'], 0, obj_index)
+        )
+
+    adu = ADUBuilder.build_adu(type_flag, object_bytes)
+    packet_builder = GBT26875Packet(source_addr=source_addr, dest_addr=dest_addr, command=command)
+    packet = packet_builder.build_packet(adu)
+    packet_view = build_packet_view(
+        packet,
+        scene_name=scene_name,
+        step_id=step['id'],
+        step_name=step['name'],
+    )
+
+    return {
+        'packet': packet,
+        'packet_hex': packet.hex(),
+        'packet_view': packet_view,
     }

@@ -21,12 +21,14 @@ try:
         SCENE_CATALOG,
         FireAlarmSimulator,
         build_packet_view,
+        sequence_manager,
     )
     from fire_alarm_simulator.services.auto_send_scene import (
         build_scene_plan,
         delete_template as delete_auto_scene_template,
         get_auto_send_meta,
         list_templates as list_auto_send_templates,
+        rebuild_step_packet,
         save_template as save_auto_scene_template,
     )
 except ModuleNotFoundError:
@@ -35,12 +37,14 @@ except ModuleNotFoundError:
         SCENE_CATALOG,
         FireAlarmSimulator,
         build_packet_view,
+        sequence_manager,
     )
     from services.auto_send_scene import (
         build_scene_plan,
         delete_template as delete_auto_scene_template,
         get_auto_send_meta,
         list_templates as list_auto_send_templates,
+        rebuild_step_packet,
         save_template as save_auto_scene_template,
     )
 
@@ -444,6 +448,12 @@ def handle_start_auto_scene(data: dict[str, Any]) -> None:
                 for step_index, step in enumerate(plan['steps'], start=1):
                     if stop_event.is_set():
                         break
+
+                    # 每步发送前重建数据包，使业务流水号递增、时间标签刷新
+                    fresh = rebuild_step_packet(step)
+                    step['packet'] = fresh['packet']
+                    step['packet_hex'] = fresh['packet_hex']
+                    step['packet_view'] = fresh['packet_view']
 
                     # 优先复用已建立的长连接，确保能接收服务器响应
                     with target_lock:
@@ -900,9 +910,32 @@ def get_stats():
         'running': simulator.running,
         'start_time': simulator.stats['start_time'],
         'history_count': len(send_history),
+        'sequence': sequence_manager.current(),
     }
     print(f'[DEBUG] /api/stats => {json.dumps(result, ensure_ascii=False)}')
     return jsonify(result)
+
+
+@app.route('/api/sequence')
+def get_sequence():
+    """获取当前业务流水号状态"""
+    return jsonify({
+        'current': sequence_manager.current(),
+        'next': sequence_manager.current(),  # 下一个将要使用的序号
+    })
+
+
+@app.route('/api/sequence/reset', methods=['POST'])
+def reset_sequence():
+    """重置业务流水号"""
+    data = request.get_json(silent=True) or {}
+    value = data.get('value', 0)
+    try:
+        value = int(value)
+    except (ValueError, TypeError):
+        return jsonify({'error': '无效的序号值'}), 400
+    sequence_manager.reset(value)
+    return jsonify({'success': True, 'current': sequence_manager.current()})
 
 
 @app.route('/api/history')

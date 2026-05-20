@@ -2,7 +2,10 @@
 const StatsModule = (function() {
     function updateStats() {
         fetch('/api/stats').then(r => r.json()).then(data => {
-            document.getElementById('totalSent').textContent = data.total_sent;
+            const totalSentEl = document.getElementById('totalSent');
+            if (totalSentEl) totalSentEl.textContent = data.total_sent;
+            const seqEl = document.getElementById('currentSequence');
+            if (seqEl) seqEl.textContent = data.sequence !== undefined ? data.sequence : '-';
         });
     }
 

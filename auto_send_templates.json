@@ -105,7 +105,113 @@
         }
       ],
       "version": 1
+    },
+    {
+      "category": "sequence",
+      "description": "测试火警等级引擎",
+      "id": "user_1809f9793d",
+      "loop": false,
+      "name": "测试 p2 级别报警",
+      "source": "user",
+      "steps": [
+        {
+          "delayAfterSec": 5,
+          "id": "step_d479f2b3",
+          "name": "1 号烟感报警",
+          "objects": [
+            {
+              "fields": {
+                "bitNo": 1,
+                "componentStatus": 2,
+                "componentType": 42,
+                "description": "默认烟感火警",
+                "occurredAt": "",
+                "occurredAtMode": "now",
+                "systemAddr": 1,
+                "systemType": 1,
+                "zoneNo": 1
+              },
+              "id": "obj_d6bce62e",
+              "objectType": "component_status"
+            }
+          ],
+          "packetHeader": {
+            "command": 2,
+            "destAddr": "0x000000000002",
+            "sourceAddr": "0xAF00BB03C041",
+            "typeFlag": 2
+          }
+        },
+        {
+          "delayAfterSec": 5,
+          "id": "step_194dc494",
+          "name": "2 号手报",
+          "objects": [
+            {
+              "fields": {
+                "bitNo": 2,
+                "componentStatus": 2,
+                "componentType": 23,
+                "description": "",
+                "occurredAt": "",
+                "occurredAtMode": "now",
+                "systemAddr": 1,
+                "systemType": 1,
+                "zoneNo": 1
+              },
+              "id": "obj_e265dc2e",
+              "objectType": "component_status"
+            }
+          ],
+          "packetHeader": {
+            "command": 2,
+            "destAddr": "0x000000000002",
+            "sourceAddr": "0xAF00BB03C041",
+            "typeFlag": 2
+          }
+        }
+      ],
+      "version": 1
+    },
+    {
+      "category": "linkage",
+      "description": "测试",
+      "id": "user_fa82df5da8",
+      "loop": false,
+      "name": "动作信号测试",
+      "source": "user",
+      "steps": [
+        {
+          "delayAfterSec": 5,
+          "id": "step_5151cb1e",
+          "name": "水泵",
+          "objects": [
+            {
+              "fields": {
+                "bitNo": 3,
+                "componentStatus": 32,
+                "componentType": 91,
+                "description": "",
+                "occurredAt": "",
+                "occurredAtMode": "now",
+                "systemAddr": 1,
+                "systemType": 11,
+                "zoneNo": 1
+              },
+              "id": "obj_bd5a9f2a",
+              "objectType": "component_status"
+            }
+          ],
+          "packetHeader": {
+            "command": 2,
+            "destAddr": "0x000000000002",
+            "sourceAddr": "0xAF00BB03C041",
+            "typeFlag": 2
+          }
+        }
+      ],
+      "version": 1
     }
   ],
-  "updated_at": "2026-05-20 13:02:43"
+  "updated_at": "2026-05-20 14:48:10"
 }

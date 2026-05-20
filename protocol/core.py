@@ -1,6 +1,7 @@
 import copy
 import datetime
 import random
+import threading
 from typing import Any, Dict, List, Optional
 
 from . import standard as st
@@ -39,6 +40,40 @@ SCENE_CATALOG = [
 ]
 
 SUPPORTED_TYPE_FLAGS = tuple(sorted(PARSER_REGISTRY))
+
+
+class SequenceManager:
+    """业务流水号全局自增管理器（线程安全）
+
+    GB/T 26875.3-2011 规定控制单元中业务流水号为2字节无符号整数，
+    范围 0~65535，溢出后回绕至0。所有数据包发送共享同一序号源，
+    确保连续发送时序号严格递增。
+    """
+
+    def __init__(self, start: int = 0):
+        self._sequence = start % 65536
+        self._lock = threading.Lock()
+
+    def next(self) -> int:
+        """获取当前序号并自增（线程安全）"""
+        with self._lock:
+            seq = self._sequence
+            self._sequence = (self._sequence + 1) % 65536
+            return seq
+
+    def current(self) -> int:
+        """获取当前序号（不自增）"""
+        with self._lock:
+            return self._sequence
+
+    def reset(self, value: int = 0) -> None:
+        """重置序号到指定值"""
+        with self._lock:
+            self._sequence = value % 65536
+
+
+# 全局单例：应用级共享的流水号管理器
+sequence_manager = SequenceManager()
 
 
 def parse_adu(adu_bytes: bytes) -> Dict[str, Any]:
@@ -118,7 +153,6 @@ class GBT26875Packet:
         self.command = command
         self.version_major = version_major
         self.version_minor = version_minor
-        self.sequence = 0
 
     def _int_to_bytes(self, value: int, length: int, signed: bool = False) -> bytes:
         return value.to_bytes(length, byteorder='little', signed=signed)
@@ -133,8 +167,8 @@ class GBT26875Packet:
     def build_packet(self, adu: bytes) -> bytes:
         if len(adu) > self.MAX_ADU_LENGTH:
             raise ValueError(f'应用数据单元长度不能超过{self.MAX_ADU_LENGTH}字节')
-        seq_bytes = self._int_to_bytes(self.sequence, 2)
-        self.sequence = (self.sequence + 1) % 65536
+        seq = sequence_manager.next()
+        seq_bytes = self._int_to_bytes(seq, 2)
         version = bytes([self.version_major, self.version_minor])
         control_unit = (
             seq_bytes

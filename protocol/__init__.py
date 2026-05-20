@@ -4,8 +4,10 @@ from .core import (
     GBT26875Packet,
     SCENE_CATALOG,
     SUPPORTED_TYPE_FLAGS,
+    SequenceManager,
     build_packet_view,
     parse_adu,
+    sequence_manager,
 )
 from .standard import (
     AnalogType,
@@ -24,8 +26,10 @@ __all__ = [
     'GBT26875Packet',
     'SCENE_CATALOG',
     'SUPPORTED_TYPE_FLAGS',
+    'SequenceManager',
     'SystemType',
     'TypeFlag',
     'build_packet_view',
     'parse_adu',
+    'sequence_manager',
 ]
