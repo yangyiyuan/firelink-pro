@@ -36,8 +36,8 @@ const PanelModule = (function() {
             setActiveSidebar('sidebarSceneLink');
             hideAllPanels();
             document.getElementById('scenePanel').classList.remove('hidden');
-            document.getElementById('mainTitle').textContent = '场景模拟';
-            document.getElementById('breadcrumbScene').textContent = '单点火灾报警';
+            document.getElementById('mainTitle').textContent = '信号模板';
+            document.getElementById('breadcrumbScene').textContent = '部件状态';
             document.getElementById('connectionStatus').style.display = 'flex';
             NetworkModule.loadNetworkConfigs();
         } else {

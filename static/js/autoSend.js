@@ -23,8 +23,8 @@ const AutoSendModule = (function() {
         { value: 'analog', label: '模拟量监控', desc: '类型标志3·温度/烟雾/压力' },
         { value: 'device', label: '传输装置', desc: '类型标志21·装置运行状态' },
         { value: 'shield', label: '屏蔽管理', desc: '类型标志2·部件状态屏蔽' },
-        { value: 'sequence', label: '序列场景', desc: '多步骤时序组合' },
-        { value: 'custom', label: '自定义', desc: '用户自定义场景' },
+        { value: 'sequence', label: '序列编排', desc: '多步骤时序组合' },
+        { value: 'custom', label: '自定义', desc: '用户自定义编排' },
     ];
 
     // 分类→协议默认值映射（meta加载后由后端覆盖）

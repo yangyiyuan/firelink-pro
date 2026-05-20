@@ -23,8 +23,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // 初始更新统计
     StatsModule.updateStats();
 
-    // 延迟选择初始场景
-    setTimeout(() => SceneModule.selectScene('single_fire'), 100);
+    // 延迟选择初始模板
+    setTimeout(() => SceneModule.selectScene('component_status'), 100);
 });
 
 function initSidebarToggle() {

@@ -27,16 +27,24 @@ ComponentType = st.ComponentType
 AnalogType = st.AnalogType
 
 SCENE_CATALOG = [
-    {'id': 'normal', 'name': '正常状态', 'description': '设备正常监视状态', 'level': 'info'},
-    {'id': 'single_fire', 'name': '单点火灾报警', 'description': '单个探测器火警', 'level': 'warning'},
-    {'id': 'confirmed_fire', 'name': '确认火警', 'description': '多点同时报警（确认火警）', 'level': 'danger'},
-    {'id': 'fault', 'name': '故障报警', 'description': '设备故障', 'level': 'warning'},
-    {'id': 'composite', 'name': '复合报警', 'description': '火警+故障同时发生', 'level': 'danger'},
-    {'id': 'analog', 'name': '模拟量超限', 'description': '温度/烟雾浓度超限', 'level': 'warning'},
-    {'id': 'system_fire', 'name': '系统级火警', 'description': '整个系统火警状态', 'level': 'danger'},
-    {'id': 'device_fire', 'name': '装置火警', 'description': '传输装置火警状态', 'level': 'danger'},
-    {'id': 'full_fire', 'name': '完整火灾场景', 'description': '完整火灾序列（4个数据包）', 'level': 'danger'},
-    {'id': 'random', 'name': '随机场景', 'description': '随机生成一种场景', 'level': 'info'},
+    # 消防设施状态 (TF 1~8)
+    {'id': 'system_status', 'name': '系统状态', 'description': '建筑消防设施系统状态', 'level': 'danger', 'group': 'facility'},
+    {'id': 'component_status', 'name': '部件状态', 'description': '部件运行状态（火警/故障/屏蔽/监管/恢复）', 'level': 'warning', 'group': 'facility'},
+    {'id': 'analog_value', 'name': '模拟量值', 'description': '部件模拟量值（温度/烟雾/压力）', 'level': 'warning', 'group': 'facility'},
+    {'id': 'operation_info', 'name': '操作信息', 'description': '消防设施操作信息（启动/反馈）', 'level': 'info', 'group': 'facility'},
+    {'id': 'system_version', 'name': '软件版本', 'description': '消防设施软件版本信息', 'level': 'info', 'group': 'facility'},
+    {'id': 'system_config', 'name': '系统配置', 'description': '消防设施系统配置情况', 'level': 'info', 'group': 'facility'},
+    {'id': 'system_time', 'name': '系统时间', 'description': '消防设施系统时间', 'level': 'info', 'group': 'facility'},
+    # 传输装置状态 (TF 21~28)
+    {'id': 'device_status', 'name': '装置运行状态', 'description': '传输装置运行状态（正常/火警/故障/屏蔽）', 'level': 'info', 'group': 'device'},
+    {'id': 'device_operation', 'name': '装置操作信息', 'description': '传输装置操作信息', 'level': 'info', 'group': 'device'},
+    {'id': 'device_config', 'name': '装置配置', 'description': '传输装置配置情况', 'level': 'info', 'group': 'device'},
+    # 确认应答 (TF 134~136)
+    {'id': 'ack_system', 'name': '系统状态确认', 'description': '系统状态确认应答', 'level': 'info', 'group': 'ack'},
+    {'id': 'ack_component', 'name': '部件状态确认', 'description': '部件状态确认应答', 'level': 'info', 'group': 'ack'},
+    {'id': 'ack_device', 'name': '装置状态确认', 'description': '装置运行状态恢复确认', 'level': 'info', 'group': 'ack'},
+    # 快捷工具
+    {'id': 'random', 'name': '随机模板', 'description': '随机生成一种信号', 'level': 'info', 'group': 'tool'},
 ]
 
 SUPPORTED_TYPE_FLAGS = tuple(sorted(PARSER_REGISTRY))
@@ -378,7 +386,25 @@ class FireAlarmSimulator:
 
     def get_scene_packet(self, scene_name: str, **kwargs: Any) -> bytes:
         scene_map = {
-            'normal': self.scene_normal,
+            # 消防设施状态 (TF 1~8)
+            'system_status': self.scene_system_fire_alarm,
+            'component_status': self.scene_single_fire_alarm,
+            'analog_value': self.scene_analog_overlimit,
+            'operation_info': self.scene_composite_alarm,
+            'system_version': self.scene_normal,
+            'system_config': self.scene_normal,
+            'system_time': self.scene_normal,
+            # 传输装置状态 (TF 21~28)
+            'device_status': self.scene_normal,
+            'device_operation': self.scene_normal,
+            'device_config': self.scene_normal,
+            # 确认应答 (TF 134~136)
+            'ack_system': self.scene_system_fire_alarm,
+            'ack_component': self.scene_single_fire_alarm,
+            'ack_device': self.scene_normal,
+            # 快捷工具
+            'random': self.generate_random_scene,
+            # 兼容旧ID
             'single_fire': self.scene_single_fire_alarm,
             'confirmed_fire': self.scene_confirmed_fire_alarm,
             'fault': self.scene_fault_alarm,
@@ -386,7 +412,7 @@ class FireAlarmSimulator:
             'analog': self.scene_analog_overlimit,
             'system_fire': self.scene_system_fire_alarm,
             'device_fire': self.scene_device_fire_status,
-            'random': self.generate_random_scene,
+            'normal': self.scene_normal,
         }
         func = scene_map.get(scene_name, self.scene_single_fire_alarm)
         return func(**kwargs) if kwargs else func()
