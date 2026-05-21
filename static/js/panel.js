@@ -11,6 +11,7 @@ const PanelModule = (function() {
         document.getElementById('autoScenePanel')?.classList.add('hidden');
         document.getElementById('signalInstancePanel')?.classList.add('hidden');
         document.getElementById('sendHistoryPanel')?.classList.add('hidden');
+        document.getElementById('parsePanel')?.classList.add('hidden');
     }
 
     function showPanel(name) {
@@ -62,6 +63,18 @@ const PanelModule = (function() {
             document.getElementById('connectionStatus').style.display = 'none';
             SendHistoryModule.loadHistoryList();
             showToast('已切换到发送历史', 'info');
+        } else if (name === 'parse') {
+            setActiveSidebar('sidebarParseLink');
+            hideAllPanels();
+            document.getElementById('parsePanel').classList.remove('hidden');
+            document.getElementById('mainTitle').textContent = '数据包解析';
+            document.getElementById('breadcrumbScene').textContent = 'GB/T 26875.3 报文逆向解析';
+            document.getElementById('connectionStatus').style.display = 'none';
+            if (typeof ParseModule !== 'undefined') {
+                ParseModule.init();
+                ParseModule.renderTypeFlagReference();
+            }
+            showToast('已切换到数据包解析', 'info');
         } else {
             showToast(`切换到 ${name} 面板`, 'info');
         }

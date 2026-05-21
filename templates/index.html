@@ -89,7 +89,7 @@
                     </svg>
                     <span class="sidebar-text">发送历史</span>
                 </a>
-                <a href="#" class="sidebar-item flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm text-jd-sidebarText" title="数据包解析">
+                <a href="#" id="sidebarParseLink" class="sidebar-item flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm text-jd-sidebarText" onclick="PanelModule.showPanel('parse')" title="数据包解析">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                     </svg>
@@ -538,6 +538,75 @@
                     </div>
                 </div>
             </div>
+
+            <div id="parsePanel" class="flex-1 overflow-hidden p-5 hidden">
+                <div class="bg-jd-card rounded-xl border border-jd-cardBorder h-full flex flex-col overflow-hidden shadow-sm">
+                    <div class="h-14 px-5 border-b border-jd-cardBorder flex items-center justify-between shrink-0">
+                        <div class="min-w-0 flex items-center gap-2">
+                            <h2 class="text-base font-semibold text-jd-text">数据包解析</h2>
+                            <p class="text-xs text-jd-textMuted">解析 GB/T 26875.3 协议报文，查看字段级结构化详情</p>
+                        </div>
+                    </div>
+                    <div class="flex-1 min-h-0 grid grid-cols-[384px_minmax(0,1fr)]">
+                        <aside class="border-r border-jd-cardBorder bg-jd-content/50 flex flex-col min-h-0 overflow-hidden" style="width:384px;min-width:384px;">
+                            <div class="p-4 border-b border-jd-cardBorder space-y-3 shrink-0">
+                                <div class="flex items-center justify-between">
+                                    <h4 class="text-sm font-semibold text-jd-text">报文输入</h4>
+                                    <div class="flex items-center gap-1.5">
+                                        <button class="btn-secondary px-2.5 py-1 rounded-md text-xs" onclick="ParseModule.formatInput()">格式化</button>
+                                        <button class="btn-secondary px-2.5 py-1 rounded-md text-xs" onclick="ParseModule.clearInput()">清空</button>
+                                    </div>
+                                </div>
+                                <textarea id="parseHexInput"
+                                    class="jd-input w-full h-28 font-mono text-xs p-3 rounded-lg bg-white resize-none"
+                                    placeholder="粘贴十六进制报文，如: 40400001000100010A1E05000000000000010000000000020002010201000100012A000100020002A32323"
+                                    spellcheck="false"></textarea>
+                                <div class="flex items-center justify-between">
+                                    <span id="parseInputHint" class="text-xs text-jd-textMuted"></span>
+                                    <button id="parseBtn" class="btn-primary px-4 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5" onclick="ParseModule.parsePacket()">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                        </svg>
+                                        <span id="parseBtnText">解析</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="p-4 border-b border-jd-cardBorder shrink-0">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h4 class="text-sm font-semibold text-jd-text">解析历史</h4>
+                                    <button class="text-[11px] text-jd-textMuted hover:text-jd-danger transition-colors" onclick="ParseModule.clearHistory()">清空</button>
+                                </div>
+                            </div>
+                            <div id="parseHistoryList" class="flex-1 overflow-y-auto scroll-thin p-3 space-y-2">
+                                <div class="text-center text-jd-textMuted text-xs py-6">暂无解析历史</div>
+                            </div>
+                            <div class="p-4 border-t border-jd-cardBorder shrink-0">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h4 class="text-sm font-semibold text-jd-text">类型标志速查</h4>
+                                </div>
+                                <div id="parseTypeFlagRef" class="max-h-48 overflow-y-auto scroll-thin space-y-0.5">
+                                </div>
+                            </div>
+                        </aside>
+                        <section class="min-w-0 flex flex-col min-h-0 overflow-hidden">
+                            <div id="parseResultEmpty" class="flex-1 flex items-center justify-center">
+                                <div class="text-center">
+                                    <svg class="w-12 h-12 text-jd-cardBorder mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                    </svg>
+                                    <p class="text-sm text-jd-textMuted">请在左侧输入十六进制报文进行解析</p>
+                                    <p class="text-xs text-jd-textMuted mt-1">支持 GB/T 26875.3-2011 协议报文</p>
+                                </div>
+                            </div>
+                            <div id="parseResultContent" class="hidden flex-1 overflow-y-auto scroll-thin p-5 space-y-4">
+                                <div id="parseOverview" class="bg-jd-card rounded-xl border border-jd-cardBorder overflow-hidden"></div>
+                                <div id="parseControlUnit" class="bg-jd-card rounded-xl border border-jd-cardBorder overflow-hidden"></div>
+                                <div id="parseADU" class="bg-jd-card rounded-xl border border-jd-cardBorder overflow-hidden"></div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 
@@ -646,6 +715,7 @@
     <script src="/static/js/signalInstance.js"></script>
     <script src="/static/js/history.js"></script>
     <script src="/static/js/sendHistory.js"></script>
+    <script src="/static/js/parse.js"></script>
     <script src="/static/js/stats.js"></script>
     <script src="/static/js/panel.js"></script>
     <script src="/static/js/utils.js"></script>
