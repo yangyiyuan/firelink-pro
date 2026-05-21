@@ -71,52 +71,52 @@
                 <div class="px-3 mb-2 sidebar-section-title">
                     <span class="text-[11px] font-medium text-jd-textMuted uppercase tracking-wider px-3">功能模块</span>
                 </div>
-                <a href="#" id="sidebarSceneLink" class="sidebar-item active flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm font-medium" onclick="PanelModule.showPanel('scene')" title="场景模拟">
+                <a href="#scene" id="sidebarSceneLink" class="sidebar-item active flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm font-medium" onclick="PanelModule.showPanel('scene'); return false;" title="场景模拟">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
                     </svg>
                     <span class="sidebar-text">场景模拟</span>
                 </a>
-                <a href="#" id="sidebarNetworkLink" class="sidebar-item flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm text-jd-sidebarText" onclick="PanelModule.showPanel('network')" title="网络配置">
-                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
-                    </svg>
-                    <span class="sidebar-text">网络配置</span>
-                </a>
-                <a href="#" id="sidebarSendHistoryLink" class="sidebar-item flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm text-jd-sidebarText" onclick="PanelModule.showPanel('sendHistory')" title="发送历史">
-                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                    <span class="sidebar-text">发送历史</span>
-                </a>
-                <a href="#" id="sidebarParseLink" class="sidebar-item flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm text-jd-sidebarText" onclick="PanelModule.showPanel('parse')" title="数据包解析">
+                <a href="#parse" id="sidebarParseLink" class="sidebar-item flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm text-jd-sidebarText" onclick="PanelModule.showPanel('parse'); return false;" title="数据包解析">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                     </svg>
                     <span class="sidebar-text">数据包解析</span>
                 </a>
-                <a href="#" id="sidebarAutoSceneLink" class="sidebar-item flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm text-jd-sidebarText" onclick="PanelModule.showPanel('autoScene')" title="场景编排">
-                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5h10M9 12h10M9 19h10M5 5h.01M5 12h.01M5 19h.01"/>
-                    </svg>
-                    <span class="sidebar-text">场景编排</span>
-                </a>
-                <a href="#" id="sidebarSignalInstanceLink" class="sidebar-item flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm text-jd-sidebarText" onclick="PanelModule.showPanel('signalInstance')" title="信号实例">
+                <a href="#signalInstance" id="sidebarSignalInstanceLink" class="sidebar-item flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm text-jd-sidebarText" onclick="PanelModule.showPanel('signalInstance'); return false;" title="信号实例">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
                     </svg>
                     <span class="sidebar-text">信号实例</span>
                 </a>
+                <a href="#autoScene" id="sidebarAutoSceneLink" class="sidebar-item flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm text-jd-sidebarText" onclick="PanelModule.showPanel('autoScene'); return false;" title="场景编排">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5h10M9 12h10M9 19h10M5 5h.01M5 12h.01M5 19h.01"/>
+                    </svg>
+                    <span class="sidebar-text">场景编排</span>
+                </a>
+                <a href="#sendHistory" id="sidebarSendHistoryLink" class="sidebar-item flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm text-jd-sidebarText" onclick="PanelModule.showPanel('sendHistory'); return false;" title="发送历史">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span class="sidebar-text">发送历史</span>
+                </a>
 
                 <div class="px-3 mt-4 mb-2 sidebar-section-title">
                     <span class="text-[11px] font-medium text-jd-textMuted uppercase tracking-wider px-3">系统</span>
                 </div>
-                <a href="#" class="sidebar-item flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm text-jd-sidebarText" title="系统设置">
+                <a href="#settings" class="sidebar-item flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm text-jd-sidebarText" title="系统设置">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                     </svg>
                     <span class="sidebar-text">系统设置</span>
+                </a>
+                <a href="#network" id="sidebarNetworkLink" class="sidebar-item flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm text-jd-sidebarText" onclick="PanelModule.showPanel('network'); return false;" title="网络配置">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
+                    </svg>
+                    <span class="sidebar-text">网络配置</span>
                 </a>
             </nav>
             <div class="p-4 border-t border-jd-cardBorder sidebar-footer">

@@ -1,5 +1,9 @@
 // 面板切换模块
 const PanelModule = (function() {
+    let _skipHashSync = false;
+
+    const VALID_PANELS = ['scene', 'network', 'autoScene', 'signalInstance', 'sendHistory', 'parse'];
+
     function setActiveSidebar(linkId) {
         document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
         document.getElementById(linkId)?.classList.add('active');
@@ -14,7 +18,13 @@ const PanelModule = (function() {
         document.getElementById('parsePanel')?.classList.add('hidden');
     }
 
-    function showPanel(name) {
+    function showPanel(name, fromHashChange) {
+        if (!fromHashChange && VALID_PANELS.includes(name)) {
+            _skipHashSync = true;
+            window.location.hash = name;
+            requestAnimationFrame(() => { _skipHashSync = false; });
+        }
+
         if (name === 'network') {
             setActiveSidebar('sidebarNetworkLink');
             hideAllPanels();
@@ -80,12 +90,29 @@ const PanelModule = (function() {
         }
     }
 
+    function initHashRouting() {
+        window.addEventListener('hashchange', () => {
+            if (_skipHashSync) return;
+            const hash = window.location.hash.slice(1);
+            if (VALID_PANELS.includes(hash)) {
+                showPanel(hash, true);
+            }
+        });
+    }
+
+    function getPanelFromHash() {
+        const hash = window.location.hash.slice(1);
+        return VALID_PANELS.includes(hash) ? hash : 'scene';
+    }
+
     function closeNetworkPanel() {
         showPanel('scene');
     }
 
     return {
         showPanel,
-        closeNetworkPanel
+        closeNetworkPanel,
+        initHashRouting,
+        getPanelFromHash
     };
 })();

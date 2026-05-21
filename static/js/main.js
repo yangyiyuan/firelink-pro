@@ -19,11 +19,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // 设置侧边栏切换
     initSidebarToggle();
 
+    // 初始化 hash 路由
+    PanelModule.initHashRouting();
+
     // 设置连接状态监听
     setupConnectionListeners(globalSocket);
 
     // 初始更新统计
     StatsModule.updateStats();
+
+    // 根据 URL hash 恢复面板，若无 hash 则默认 scene
+    const initialPanel = PanelModule.getPanelFromHash();
+    if (initialPanel !== 'scene') {
+        PanelModule.showPanel(initialPanel, true);
+    }
 
     // 延迟选择初始模板
     setTimeout(() => SceneModule.selectScene('component_status'), 100);
