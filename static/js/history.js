@@ -297,8 +297,8 @@ const HistoryModule = (function() {
                 ? 'text-jd-danger'
                 : 'text-jd-text';
         return `
-            <div class="bg-white rounded-lg border border-jd-cardBorder px-3 py-2">
-                <div class="text-[11px] text-jd-textMuted mb-1">${escapeHtml(field.label)}</div>
+            <div class="bg-white rounded-lg border border-jd-cardBorder px-3 py-1.5">
+                <div class="text-[11px] text-jd-textMuted mb-0.5">${escapeHtml(field.label)}</div>
                 <div class="text-sm ${mono} font-medium ${accent} break-all">${escapeHtml(field.value)}</div>
             </div>
         `;
@@ -307,16 +307,16 @@ const HistoryModule = (function() {
     function renderFlags(flags) {
         if (!flags || !flags.length) return '';
         return `
-            <div class="space-y-2">
+            <div class="space-y-1">
                 <div class="text-xs font-medium text-jd-text">状态位解码</div>
-                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-1">
                     ${flags.map(flag => `
-                        <div class="rounded-lg border px-3 py-2 ${flag.active ? 'border-amber-200 bg-amber-50' : 'border-jd-cardBorder bg-white'}">
+                        <div class="rounded-lg border px-3 py-1.5 ${flag.active ? 'border-amber-200 bg-amber-50' : 'border-jd-cardBorder bg-white'}">
                             <div class="flex items-center justify-between gap-2">
                                 <span class="text-[11px] text-jd-textMuted">bit${flag.bit} · ${escapeHtml(flag.label)}</span>
                                 <span class="text-[10px] px-1.5 py-0.5 rounded-full ${flag.active ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-jd-textMuted'}">${flag.active ? '1' : '0'}</span>
                             </div>
-                            <div class="text-sm font-medium ${flag.active ? 'text-amber-700' : 'text-jd-text'} mt-1">${escapeHtml(flag.text)}</div>
+                            <div class="text-sm font-medium ${flag.active ? 'text-amber-700' : 'text-jd-text'} mt-0.5">${escapeHtml(flag.text)}</div>
                         </div>
                     `).join('')}
                 </div>
@@ -383,18 +383,18 @@ const HistoryModule = (function() {
                         ? '查岗'
                         : '信息';
         return `
-            <section class="rounded-xl border p-4 space-y-3 ${style.wrap}">
+            <section class="rounded-xl border p-3 space-y-2 ${style.wrap}">
                 <div class="flex items-start justify-between gap-3 flex-wrap">
                     <div>
                         <div class="flex items-center gap-2 flex-wrap">
                             <h4 class="text-sm font-semibold ${style.title}">${escapeHtml(obj.title || '信息对象')}</h4>
                             <span class="text-[10px] px-1.5 py-0.5 rounded-full ${style.badge}">${severityLabel}</span>
                         </div>
-                        <p class="text-xs text-jd-textSecondary mt-1">${escapeHtml(obj.summary || '-')}</p>
+                        <p class="text-xs text-jd-textSecondary mt-0.5">${escapeHtml(obj.summary || '-')}</p>
                     </div>
                     ${obj.occurred_at ? `<span class="text-[11px] px-2 py-1 rounded-full bg-white border border-jd-cardBorder text-jd-textMuted font-mono">${escapeHtml(obj.occurred_at)}</span>` : ''}
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-1.5">
                     ${(obj.fields || []).map(renderField).join('')}
                 </div>
                 ${renderFlags(obj.status_flags || [])}
@@ -405,11 +405,11 @@ const HistoryModule = (function() {
     function renderNotes(notes) {
         if (!notes || !notes.length) return '';
         return `
-            <section class="space-y-2">
+            <section class="space-y-1">
                 <div class="text-xs font-medium text-jd-text">解析说明</div>
-                <div class="space-y-2">
+                <div class="space-y-1">
                     ${notes.map(note => `
-                        <div class="rounded-lg border border-jd-primaryBorder bg-jd-primaryLight px-3 py-2 text-xs text-jd-textSecondary">
+                        <div class="rounded-lg border border-jd-primaryBorder bg-jd-primaryLight px-3 py-1.5 text-xs text-jd-textSecondary">
                             ${escapeHtml(note)}
                         </div>
                     `).join('')}
@@ -434,8 +434,8 @@ const HistoryModule = (function() {
         badge.textContent = `${aduObjects.length} 个对象`;
 
         content.innerHTML = `
-            <div class="space-y-4">
-                <div class="grid grid-cols-2 xl:grid-cols-4 gap-2">
+            <div class="space-y-2">
+                <div class="grid grid-cols-5 gap-1.5">
                     ${[
                         { label: '方向', value: adu.direction },
                         { label: '类型标志', value: `${adu.type_flag} / ${adu.type_flag_name}`, mono: true, accent: 'primary' },
@@ -445,17 +445,17 @@ const HistoryModule = (function() {
                     ].map(renderField).join('')}
                 </div>
                 ${aduObjects.length ? `
-                    <div class="space-y-3">
+                    <div class="space-y-2">
                         ${aduObjects.map(renderObjectCard).join('')}
                     </div>
                 ` : `
-                    <div class="rounded-lg border border-jd-cardBorder bg-white px-4 py-3 text-sm text-jd-textMuted">
+                    <div class="rounded-lg border border-jd-cardBorder bg-white px-3 py-2 text-sm text-jd-textMuted">
                         当前 ADU 无信息对象，常见于确认、否认或保留命令。
                     </div>
                 `}
                 ${renderNotes(adu.notes)}
                 ${adu.payload_hex ? `
-                <section class="space-y-2">
+                <section class="space-y-1">
                     <div class="text-xs text-jd-textMuted">ADU 负载 HEX</div>
                     <div class="raw-hex-box hex-display">${SceneModule.formatHex(adu.payload_hex)}</div>
                 </section>
