@@ -179,19 +179,26 @@ const NetworkModule = (function() {
     }
 
     function deleteConfig(id) {
-        if (!confirm('确定要删除这个网络配置吗？')) return;
-        fetch(`/api/network_configs/${id}`, { method: 'DELETE' })
-            .then(r => r.json()).then(result => {
-                if (result.success) {
-                    showToast('配置已删除', 'success');
-                    loadNetworkConfigList();
-                    loadNetworkConfigs();
-                } else {
-                    showToast(result.error || '删除失败', 'error');
-                }
-            }).catch(() => {
-                showToast('删除失败', 'error');
-            });
+        ConfirmDialog.show({
+            title: '删除网络配置',
+            message: '确定要删除这个网络配置吗？',
+            type: 'danger',
+            confirmText: '删除'
+        }).then(ok => {
+            if (!ok) return;
+            fetch(`/api/network_configs/${id}`, { method: 'DELETE' })
+                .then(r => r.json()).then(result => {
+                    if (result.success) {
+                        showToast('配置已删除', 'success');
+                        loadNetworkConfigList();
+                        loadNetworkConfigs();
+                    } else {
+                        showToast(result.error || '删除失败', 'error');
+                    }
+                }).catch(() => {
+                    showToast('删除失败', 'error');
+                });
+        });
     }
 
     function testConnection() {

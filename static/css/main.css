@@ -403,3 +403,57 @@ span.flatpickr-weekday {
     background: rgba(255,255,255,0.9);
     backdrop-filter: blur(4px);
 }
+
+/* Send History Panel */
+#savedHistoryList > div[class*="rounded-lg"] {
+    transition: all 0.15s ease;
+}
+#savedHistoryList > div[class*="rounded-lg"]:hover {
+    border-color: #CBD5E1;
+}
+#savedHistoryList > div[class*="rounded-lg"]:hover button[title="删除"] {
+    opacity: 1 !important;
+}
+
+#savedHistoryDetail {
+    animation: detailFadeIn 0.2s ease-out;
+}
+@keyframes detailFadeIn {
+    from { opacity: 0; transform: translateX(8px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+#savedHistoryEmpty {
+    animation: emptyFadeIn 0.3s ease-out;
+}
+@keyframes emptyFadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Save Menu Dropdown */
+#saveHistoryMenu {
+    animation: menuSlideDown 0.15s ease-out;
+}
+@keyframes menuSlideDown {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+#saveHistoryMenu button:hover {
+    color: #2563EB;
+}
+
+#confirmDialog:not(.hidden) {
+    animation: confirmOverlayIn 0.2s ease-out;
+}
+#confirmDialog:not(.hidden) .confirm-dialog-content {
+    animation: confirmContentIn 0.2s ease-out;
+}
+@keyframes confirmOverlayIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@keyframes confirmContentIn {
+    from { opacity: 0; transform: scale(0.95) translateY(8px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}

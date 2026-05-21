@@ -541,8 +541,14 @@ const SignalInstanceModule = (function() {
     }
 
     function confirmDelete(instanceId) {
-        if (!confirm('确定要删除此信号实例吗？')) return;
-        doDelete(instanceId);
+        ConfirmDialog.show({
+            title: '删除信号实例',
+            message: '确定要删除此信号实例吗？',
+            type: 'danger',
+            confirmText: '删除'
+        }).then(ok => {
+            if (ok) doDelete(instanceId);
+        });
     }
 
     async function doDelete(instanceId) {

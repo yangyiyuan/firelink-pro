@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     AutoSendModule.init(globalSocket);
     SignalInstanceModule.init(globalSocket);
     HistoryModule.init(globalSocket);
+    SendHistoryModule.init();
 
     // 初始化自定义下拉框
     CustomSelect.initAll();

@@ -12,6 +12,7 @@ import socket
 import threading
 import time
 from typing import Any
+from urllib.parse import quote
 
 from flask import Flask, jsonify, render_template, request
 from flask_socketio import SocketIO, emit
@@ -116,6 +117,8 @@ if is_reloader_process():
 simulator = FireAlarmSimulator()
 send_history = []
 max_history = 1000
+HISTORY_DIR = os.path.join(os.path.dirname(__file__), 'data', 'history')
+os.makedirs(HISTORY_DIR, exist_ok=True)
 
 
 def push_history(entry: dict[str, Any]) -> None:
@@ -1087,6 +1090,244 @@ def clear_history():
     global send_history
     send_history = []
     return jsonify({'success': True})
+
+
+@app.route('/api/history/save', methods=['POST'])
+def save_history():
+    if not send_history:
+        return jsonify({'success': False, 'error': '暂无记录可保存'})
+
+    packet_hex_set = set()
+    for r in send_history:
+        if r.get('history_type') == 'packet' and r.get('parsed', {}).get('raw_hex'):
+            packet_hex_set.add(r['parsed']['raw_hex'])
+
+    deduped = []
+    for r in send_history:
+        if r.get('history_type') == 'raw' and r.get('data_hex') and r['data_hex'] in packet_hex_set:
+            continue
+        deduped.append(r)
+
+    timestamp_str = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    history_id = f'history_{timestamp_str}'
+
+    send_count = sum(1 for r in deduped if r.get('direction') == 'send')
+    recv_count = len(deduped) - send_count
+
+    payload = {
+        'metadata': {
+            'save_time': now_ms(),
+            'total_count': len(deduped),
+            'send_count': send_count,
+            'recv_count': recv_count,
+            'source': '消防协议模拟器 v2.1',
+        },
+        'records': deduped,
+    }
+
+    filepath = os.path.join(HISTORY_DIR, f'{history_id}.json')
+    try:
+        with open(filepath, 'w', encoding='utf-8') as fh:
+            json.dump(payload, fh, ensure_ascii=False, indent=2)
+    except Exception as exc:
+        return jsonify({'success': False, 'error': f'保存失败: {exc}'})
+
+    return jsonify({
+        'success': True,
+        'id': history_id,
+        'save_time': payload['metadata']['save_time'],
+        'total_count': len(deduped),
+        'send_count': send_count,
+        'recv_count': recv_count,
+    })
+
+
+@app.route('/api/history/list')
+def list_saved_history():
+    histories = []
+    if not os.path.isdir(HISTORY_DIR):
+        return jsonify({'histories': histories})
+
+    for filename in sorted(os.listdir(HISTORY_DIR), reverse=True):
+        if not filename.startswith('history_') or not filename.endswith('.json'):
+            continue
+        filepath = os.path.join(HISTORY_DIR, filename)
+        try:
+            with open(filepath, 'r', encoding='utf-8') as fh:
+                data = json.load(fh)
+            meta = data.get('metadata', {})
+            histories.append({
+                'id': filename[:-5],
+                'save_time': meta.get('save_time', ''),
+                'total_count': meta.get('total_count', 0),
+                'send_count': meta.get('send_count', 0),
+                'recv_count': meta.get('recv_count', 0),
+            })
+        except Exception:
+            histories.append({
+                'id': filename[:-5],
+                'save_time': '',
+                'total_count': 0,
+                'send_count': 0,
+                'recv_count': 0,
+                'corrupted': True,
+            })
+
+    return jsonify({'histories': histories})
+
+
+@app.route('/api/history/saved/<history_id>')
+def get_saved_history(history_id):
+    safe_id = os.path.basename(history_id)
+    filepath = os.path.join(HISTORY_DIR, f'{safe_id}.json')
+
+    if not os.path.isfile(filepath):
+        return jsonify({'success': False, 'error': '历史记录不存在'}), 404
+
+    try:
+        with open(filepath, 'r', encoding='utf-8') as fh:
+            data = json.load(fh)
+    except json.JSONDecodeError:
+        return jsonify({'success': False, 'error': '历史记录文件已损坏'}), 500
+
+    return jsonify(data)
+
+
+@app.route('/api/history/saved/<history_id>', methods=['DELETE'])
+def delete_saved_history(history_id):
+    safe_id = os.path.basename(history_id)
+    filepath = os.path.join(HISTORY_DIR, f'{safe_id}.json')
+
+    if not os.path.isfile(filepath):
+        return jsonify({'success': False, 'error': '历史记录不存在'}), 404
+
+    try:
+        os.remove(filepath)
+    except Exception as exc:
+        return jsonify({'success': False, 'error': f'删除失败: {exc}'}), 500
+
+    return jsonify({'success': True})
+
+
+def _build_json_export(records):
+    send_count = sum(1 for r in records if r.get('direction') == 'send')
+    recv_count = len(records) - send_count
+
+    payload = {
+        'metadata': {
+            'export_time': now_ms(),
+            'total_count': len(records),
+            'send_count': send_count,
+            'recv_count': recv_count,
+            'source': '消防协议模拟器 v2.1',
+        },
+        'records': records,
+    }
+
+    filename = f'通信记录_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.json'
+    ascii_name = quote(filename)
+    response = app.response_class(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        mimetype='application/json',
+    )
+    response.headers['Content-Disposition'] = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{ascii_name}"
+    return response
+
+
+def _build_csv_export(records):
+    import csv
+    import io
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow([
+        '序号', '方向', '类型', '源', '目标', '协议',
+        '时间', '长度', '场景/类型', '状态', 'HEX',
+    ])
+
+    for idx, item in enumerate(records, start=1):
+        direction = item.get('direction', '')
+        direction_label = '发送' if direction == 'send' else '接收'
+
+        scene_or_type = (
+            item.get('scene_name')
+            or item.get('step_name')
+            or (item.get('parsed', {}).get('adu_summary') if isinstance(item.get('parsed'), dict) else None)
+            or (item.get('parsed', {}).get('type_flag_name') if isinstance(item.get('parsed'), dict) else None)
+            or ('原始数据' if item.get('data_hex') else '-')
+        )
+
+        status = (
+            '成功' if item.get('success', True) else '失败'
+        ) if direction == 'send' else '-'
+
+        hex_data = item.get('hex', '') or item.get('data_hex', '') or ''
+
+        writer.writerow([
+            idx,
+            direction_label,
+            item.get('history_type', direction),
+            item.get('source', '本机') if direction == 'send' else f"{item.get('host', '')}:{item.get('port', '')}",
+            item.get('target', '本机') if direction == 'send' else '本机',
+            (item.get('protocol', '') or '').upper(),
+            item.get('timestamp', ''),
+            item.get('length', 0) or item.get('data_length', 0),
+            scene_or_type,
+            status,
+            hex_data,
+        ])
+
+    csv_content = output.getvalue()
+    filename = f'通信记录_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.csv'
+    ascii_name = quote(filename)
+
+    response = app.response_class(
+        '\ufeff' + csv_content,
+        mimetype='text/csv; charset=utf-8',
+    )
+    response.headers['Content-Disposition'] = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{ascii_name}"
+    return response
+
+
+@app.route('/api/history/export')
+def export_history():
+    fmt = request.args.get('format', 'json')
+    if not send_history:
+        return '', 204
+    if fmt == 'json':
+        return _build_json_export(send_history)
+    elif fmt == 'csv':
+        return _build_csv_export(send_history)
+    else:
+        return jsonify({'error': '无效的导出格式，支持 json 或 csv'}), 400
+
+
+@app.route('/api/history/saved/<history_id>/export')
+def export_saved_history(history_id):
+    fmt = request.args.get('format', 'json')
+    safe_id = os.path.basename(history_id)
+    filepath = os.path.join(HISTORY_DIR, f'{safe_id}.json')
+
+    if not os.path.isfile(filepath):
+        return jsonify({'error': '历史记录不存在'}), 404
+
+    try:
+        with open(filepath, 'r', encoding='utf-8') as fh:
+            data = json.load(fh)
+    except json.JSONDecodeError:
+        return jsonify({'error': '历史记录文件已损坏'}), 500
+
+    records = data.get('records', [])
+    if not records:
+        return '', 204
+
+    if fmt == 'json':
+        return _build_json_export(records)
+    elif fmt == 'csv':
+        return _build_csv_export(records)
+    else:
+        return jsonify({'error': '无效的导出格式，支持 json 或 csv'}), 400
 
 
 @app.route('/api/network_configs', methods=['GET'])

@@ -10,6 +10,7 @@ const PanelModule = (function() {
         document.getElementById('networkPanel')?.classList.add('hidden');
         document.getElementById('autoScenePanel')?.classList.add('hidden');
         document.getElementById('signalInstancePanel')?.classList.add('hidden');
+        document.getElementById('sendHistoryPanel')?.classList.add('hidden');
     }
 
     function showPanel(name) {
@@ -52,6 +53,15 @@ const PanelModule = (function() {
             document.getElementById('breadcrumbScene').textContent = '部件状态';
             document.getElementById('connectionStatus').style.display = 'flex';
             NetworkModule.loadNetworkConfigs();
+        } else if (name === 'sendHistory') {
+            setActiveSidebar('sidebarSendHistoryLink');
+            hideAllPanels();
+            document.getElementById('sendHistoryPanel').classList.remove('hidden');
+            document.getElementById('mainTitle').textContent = '发送历史';
+            document.getElementById('breadcrumbScene').textContent = '已保存的通信记录';
+            document.getElementById('connectionStatus').style.display = 'none';
+            SendHistoryModule.loadHistoryList();
+            showToast('已切换到发送历史', 'info');
         } else {
             showToast(`切换到 ${name} 面板`, 'info');
         }

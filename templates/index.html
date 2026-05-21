@@ -83,7 +83,7 @@
                     </svg>
                     <span class="sidebar-text">网络配置</span>
                 </a>
-                <a href="#" class="sidebar-item flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm text-jd-sidebarText" title="发送历史">
+                <a href="#" id="sidebarSendHistoryLink" class="sidebar-item flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm text-jd-sidebarText" onclick="PanelModule.showPanel('sendHistory')" title="发送历史">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
@@ -249,6 +249,18 @@
                                         <span class="text-xs text-jd-textMuted" id="historyCount">(0)</span>
                                     </div>
                                     <div class="flex items-center gap-2">
+                                        <div class="relative inline-block">
+                                            <button id="saveHistoryBtn" class="btn-secondary px-3 py-1 rounded-md text-xs flex items-center gap-1" onclick="HistoryModule.toggleSaveMenu(event)">
+                                                保存
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                            </button>
+                                            <div id="saveHistoryMenu" class="hidden absolute right-0 top-full mt-1 bg-white border border-jd-cardBorder rounded-lg shadow-lg z-50 min-w-[130px] py-1">
+                                                <button id="saveRecordBtn" class="block w-full text-left px-3 py-1.5 text-xs hover:bg-jd-content" onclick="HistoryModule.saveHistory()">保存记录</button>
+                                                <div class="border-t border-jd-cardBorder my-1"></div>
+                                                <button class="block w-full text-left px-3 py-1.5 text-xs hover:bg-jd-content" onclick="HistoryModule.exportHistory('json')">导出 JSON</button>
+                                                <button class="block w-full text-left px-3 py-1.5 text-xs hover:bg-jd-content" onclick="HistoryModule.exportHistory('csv')">导出 CSV</button>
+                                            </div>
+                                        </div>
                                         <button class="btn-secondary px-3 py-1 rounded-md text-xs" onclick="HistoryModule.loadHistory(true)">刷新</button>
                                         <button class="btn-secondary px-3 py-1 rounded-md text-xs" onclick="HistoryModule.clearHistory()">清空</button>
                                     </div>
@@ -447,6 +459,85 @@
                     </div>
                 </div>
             </div>
+
+            <div id="sendHistoryPanel" class="flex-1 overflow-hidden p-5 hidden">
+                <div class="bg-jd-card rounded-xl border border-jd-cardBorder h-full flex flex-col overflow-hidden shadow-sm">
+                    <div class="h-14 px-5 border-b border-jd-cardBorder flex items-center justify-between shrink-0">
+                        <div class="min-w-0 flex items-center gap-2">
+                            <h2 class="text-base font-semibold text-jd-text">发送历史</h2>
+                            <p class="text-xs text-jd-textMuted">查看已保存的通信记录快照</p>
+                        </div>
+                    </div>
+                    <div class="flex-1 min-h-0 grid grid-cols-[320px_minmax(0,1fr)]" id="sendHistoryGridLayout">
+                        <aside class="border-r border-jd-cardBorder bg-jd-content/50 flex flex-col min-h-0 overflow-hidden" style="width:320px;min-width:320px;">
+                            <div class="p-4 border-b border-jd-cardBorder space-y-3 shrink-0">
+                                <div class="flex items-center justify-between">
+                                    <h4 class="text-sm font-semibold text-jd-text">历史记录</h4>
+                                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-jd-primaryLight text-jd-primary font-medium" id="savedHistoryBadge">0 条</span>
+                                </div>
+                                <input type="text" class="jd-input w-full px-3 py-2 rounded-lg text-sm bg-white" placeholder="搜索历史记录..." oninput="SendHistoryModule.filterList(this.value)">
+                            </div>
+                            <div id="savedHistoryList" class="flex-1 overflow-y-auto scroll-thin p-3 space-y-2">
+                                <div class="text-center text-jd-textMuted text-sm py-8">暂无保存的发送历史</div>
+                            </div>
+                        </aside>
+                        <section class="min-w-0 flex flex-col min-h-0 overflow-hidden">
+                            <div id="savedHistoryEmpty" class="flex-1 flex items-center justify-center">
+                                <div class="text-center">
+                                    <svg class="w-12 h-12 text-jd-cardBorder mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                    </svg>
+                                    <p class="text-sm text-jd-textMuted">选择一条历史记录查看详情</p>
+                                    <p class="text-xs text-jd-textMuted mt-1">在通信记录区域点击"保存"按钮创建记录</p>
+                                </div>
+                            </div>
+                            <div id="savedHistoryDetail" class="hidden flex-1 flex flex-col min-h-0 overflow-hidden">
+                                <div class="px-5 py-3 border-b border-jd-cardBorder shrink-0 space-y-3">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-2 min-w-0">
+                                            <svg class="w-4 h-4 text-jd-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                            </svg>
+                                            <span class="text-sm font-semibold text-jd-text truncate" id="savedHistoryTitle">历史详情</span>
+                                            <span class="text-[10px] px-1.5 py-0.5 rounded bg-jd-primaryLight text-jd-primary font-medium shrink-0" id="savedHistoryCount"></span>
+                                        </div>
+                                        <div class="flex items-center gap-1.5 shrink-0">
+                                            <button class="btn-secondary px-2.5 py-1 rounded-md text-xs flex items-center gap-1" onclick="SendHistoryModule.exportCurrent('json')">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                                JSON
+                                            </button>
+                                            <button class="btn-secondary px-2.5 py-1 rounded-md text-xs flex items-center gap-1" onclick="SendHistoryModule.exportCurrent('csv')">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                                CSV
+                                            </button>
+                                            <button class="btn-secondary px-2.5 py-1 rounded-md text-xs flex items-center gap-1 text-red-500 hover:bg-red-50 hover:border-red-200" onclick="SendHistoryModule.deleteCurrent()">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                                删除
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-3 text-xs" id="savedHistoryMeta">
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <div class="scene-tab-group">
+                                            <button class="scene-tab-btn active text-[11px] px-3 py-1 transition-all font-medium" data-filter="all" onclick="SendHistoryModule.filterRecords('all')">全部</button>
+                                            <button class="scene-tab-btn text-[11px] px-3 py-1 transition-all font-medium" data-filter="send" onclick="SendHistoryModule.filterRecords('send')">
+                                                <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 mr-0.5"></span>发送
+                                            </button>
+                                            <button class="scene-tab-btn text-[11px] px-3 py-1 transition-all font-medium" data-filter="recv" onclick="SendHistoryModule.filterRecords('recv')">
+                                                <span class="inline-block w-1.5 h-1.5 rounded-full bg-blue-400 mr-0.5"></span>接收
+                                            </button>
+                                        </div>
+                                        <div class="flex-1"></div>
+                                        <span class="text-[10px] text-jd-textMuted" id="savedHistoryFilterCount"></span>
+                                    </div>
+                                </div>
+                                <div class="flex-1 overflow-y-auto scroll-thin px-4 py-2" id="savedHistoryRecords"></div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 
@@ -518,6 +609,29 @@
     </div>
 
     <!-- Toast -->
+    <!-- Confirm Dialog -->
+    <div id="confirmDialog" class="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] hidden" onclick="if(event.target===this)ConfirmDialog.cancel()">
+        <div class="bg-jd-card rounded-xl border border-jd-cardBorder w-full max-w-sm mx-4 overflow-hidden shadow-xl confirm-dialog-content">
+            <div class="px-5 pt-5 pb-3">
+                <div class="flex items-start gap-3">
+                    <div id="confirmDialogIcon" class="w-9 h-9 rounded-full bg-red-50 flex items-center justify-center shrink-0">
+                        <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                        </svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <h3 class="text-sm font-semibold text-jd-text" id="confirmDialogTitle">确认操作</h3>
+                        <p class="text-xs text-jd-textSecondary mt-1 leading-relaxed" id="confirmDialogMessage">确定要执行此操作吗？</p>
+                    </div>
+                </div>
+            </div>
+            <div class="px-5 pb-4 flex gap-2 justify-end">
+                <button class="btn-secondary px-4 py-1.5 rounded-lg text-sm font-medium" id="confirmDialogCancelBtn" onclick="ConfirmDialog.cancel()">取消</button>
+                <button class="btn-primary px-4 py-1.5 rounded-lg text-sm font-medium" id="confirmDialogConfirmBtn" onclick="ConfirmDialog.confirm()">确定</button>
+            </div>
+        </div>
+    </div>
+
     <div id="toast" class="fixed top-5 right-5 px-5 py-3 rounded-lg text-white text-sm font-medium shadow-lg transition-all duration-300 z-50" style="transform: translateX(calc(100% + 20px)); opacity: 0;"></div>
 
     <!-- Flatpickr -->
@@ -531,6 +645,7 @@
     <script src="/static/js/autoSend.js"></script>
     <script src="/static/js/signalInstance.js"></script>
     <script src="/static/js/history.js"></script>
+    <script src="/static/js/sendHistory.js"></script>
     <script src="/static/js/stats.js"></script>
     <script src="/static/js/panel.js"></script>
     <script src="/static/js/utils.js"></script>

@@ -571,6 +571,31 @@ const HistoryModule = (function() {
         });
     }
 
+    function toggleSaveMenu(event) {
+        event.stopPropagation();
+        const menu = document.getElementById('saveHistoryMenu');
+        menu.classList.toggle('hidden');
+    }
+
+    function saveHistory() {
+        document.getElementById('saveHistoryMenu').classList.add('hidden');
+        fetch('/api/history/save', {method: 'POST'})
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(`保存成功，共 ${data.total_count} 条记录`, 'success');
+                } else {
+                    showToast(data.error || '保存失败', 'error');
+                }
+            })
+            .catch(() => showToast('保存请求失败', 'error'));
+    }
+
+    function exportHistory(format) {
+        document.getElementById('saveHistoryMenu').classList.add('hidden');
+        window.location.href = `/api/history/export?format=${format}`;
+    }
+
     return {
         init,
         loadHistory,
@@ -582,6 +607,9 @@ const HistoryModule = (function() {
         applyHex,
         renderPacketDetail,
         openAduModal,
-        closeAduModal
+        closeAduModal,
+        toggleSaveMenu,
+        saveHistory,
+        exportHistory
     };
 })();
