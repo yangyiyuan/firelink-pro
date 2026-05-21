@@ -49,15 +49,11 @@ function initSidebarToggle() {
 
 function setupConnectionListeners(socket) {
     socket.on('connect', () => {
-        const el = document.getElementById('connectionStatus');
-        el.className = 'flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-jd-successLight text-jd-success';
-        el.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-jd-success"></span>已连接';
+        NetworkModule.updateConnectionStatus(true);
     });
 
     socket.on('disconnect', () => {
-        const el = document.getElementById('connectionStatus');
-        el.className = 'flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-jd-dangerLight text-jd-danger';
-        el.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-jd-danger"></span>未连接';
+        NetworkModule.updateConnectionStatus(false);
     });
 
     socket.on('error', (data) => showToast(data.message, 'error'));

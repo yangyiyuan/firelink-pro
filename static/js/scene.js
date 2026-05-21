@@ -168,13 +168,7 @@ const SceneModule = (function() {
     }
 
     function formatHex(hex) {
-        return hex.match(/.{1,2}/g).map((b, i) => {
-            let color = '#94A3B8';
-            if (i < 2) color = '#10B981';
-            else if (i >= hex.length/2 - 2) color = '#EF4444';
-            else if (i >= 2 && i < 27) color = '#2563EB';
-            return `<span style="color: ${color}">${b}</span>`;
-        }).join(' ');
+        return AduCommon.formatHex(hex);
     }
 
     function getCurrentScene() {
@@ -232,7 +226,7 @@ const SceneModule = (function() {
         const list = document.getElementById('sceneInstanceList');
         if (!list) return;
 
-        const esc = (v) => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        const esc = AduCommon.escapeHtml;
 
         const kw = sidebarInstanceKeyword.trim().toLowerCase();
         const filtered = sidebarInstances.filter(item => {

@@ -5,6 +5,8 @@ const HistoryModule = (function() {
     let recvRawTimers = new Map();
     let historyPacketHexSet = new Set();
 
+    const _hl = AduCommon.createHighlightManager('#aduModalContent .hex-display-interactive');
+
     function init(socketInstance) {
         socket = socketInstance;
         setupSocketListeners();
@@ -281,141 +283,31 @@ const HistoryModule = (function() {
     }
 
     function escapeHtml(value) {
-        return String(value ?? '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
+        return AduCommon.escapeHtml(value);
     }
 
-    function renderField(field) {
-        const mono = field.mono ? 'font-mono' : '';
-        const accent = field.accent === 'primary'
-            ? 'text-jd-primary'
-            : field.accent === 'danger'
-                ? 'text-jd-danger'
-                : 'text-jd-text';
-        return `
-            <div class="bg-white rounded-lg border border-jd-cardBorder px-3 py-1.5">
-                <div class="text-[11px] text-jd-textMuted mb-0.5">${escapeHtml(field.label)}</div>
-                <div class="text-sm ${mono} font-medium ${accent} break-all">${escapeHtml(field.value)}</div>
-            </div>
-        `;
+    function renderField(field, byteRange) {
+        return AduCommon.renderField(field, byteRange, 'HistoryModule.handleFieldClick');
     }
 
     function renderFlags(flags) {
-        if (!flags || !flags.length) return '';
-        return `
-            <div class="space-y-1">
-                <div class="text-xs font-medium text-jd-text">状态位解码</div>
-                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-1">
-                    ${flags.map(flag => `
-                        <div class="rounded-lg border px-3 py-1.5 ${flag.active ? 'border-amber-200 bg-amber-50' : 'border-jd-cardBorder bg-white'}">
-                            <div class="flex items-center justify-between gap-2">
-                                <span class="text-[11px] text-jd-textMuted">bit${flag.bit} · ${escapeHtml(flag.label)}</span>
-                                <span class="text-[10px] px-1.5 py-0.5 rounded-full ${flag.active ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-jd-textMuted'}">${flag.active ? '1' : '0'}</span>
-                            </div>
-                            <div class="text-sm font-medium ${flag.active ? 'text-amber-700' : 'text-jd-text'} mt-0.5">${escapeHtml(flag.text)}</div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
+        return AduCommon.renderFlags(flags);
     }
 
     function getObjectSeverity(obj) {
-        const active = (obj?.status_flags || []).filter(flag => flag.active).map(flag => flag.on);
-        const keywords = active.join(' ');
-        if (/火警|报警/.test(keywords)) return 'alarm';
-        if (/故障/.test(keywords)) return 'fault';
-        if (/恢复/.test(keywords)) return 'recovery';
-        if (/查岗/.test(keywords)) return 'duty';
-        return 'normal';
+        return AduCommon.getObjectSeverity(obj);
     }
 
     function getObjectCardStyle(severity) {
-        if (severity === 'alarm') {
-            return {
-                wrap: 'border-red-200 bg-red-50/70',
-                badge: 'bg-red-100 text-red-700',
-                title: 'text-red-700'
-            };
-        }
-        if (severity === 'fault') {
-            return {
-                wrap: 'border-amber-200 bg-amber-50/70',
-                badge: 'bg-amber-100 text-amber-700',
-                title: 'text-amber-700'
-            };
-        }
-        if (severity === 'recovery') {
-            return {
-                wrap: 'border-emerald-200 bg-emerald-50/70',
-                badge: 'bg-emerald-100 text-emerald-700',
-                title: 'text-emerald-700'
-            };
-        }
-        if (severity === 'duty') {
-            return {
-                wrap: 'border-sky-200 bg-sky-50/70',
-                badge: 'bg-sky-100 text-sky-700',
-                title: 'text-sky-700'
-            };
-        }
-        return {
-            wrap: 'border-jd-cardBorder bg-jd-content/50',
-            badge: 'bg-slate-100 text-jd-textMuted',
-            title: 'text-jd-text'
-        };
+        return AduCommon.getObjectCardStyle(severity);
     }
 
-    function renderObjectCard(obj) {
-        const severity = getObjectSeverity(obj);
-        const style = getObjectCardStyle(severity);
-        const severityLabel = severity === 'alarm'
-            ? '火警'
-            : severity === 'fault'
-                ? '故障'
-                : severity === 'recovery'
-                    ? '恢复'
-                    : severity === 'duty'
-                        ? '查岗'
-                        : '信息';
-        return `
-            <section class="rounded-xl border p-3 space-y-2 ${style.wrap}">
-                <div class="flex items-start justify-between gap-3 flex-wrap">
-                    <div>
-                        <div class="flex items-center gap-2 flex-wrap">
-                            <h4 class="text-sm font-semibold ${style.title}">${escapeHtml(obj.title || '信息对象')}</h4>
-                            <span class="text-[10px] px-1.5 py-0.5 rounded-full ${style.badge}">${severityLabel}</span>
-                        </div>
-                        <p class="text-xs text-jd-textSecondary mt-0.5">${escapeHtml(obj.summary || '-')}</p>
-                    </div>
-                    ${obj.occurred_at ? `<span class="text-[11px] px-2 py-1 rounded-full bg-white border border-jd-cardBorder text-jd-textMuted font-mono">${escapeHtml(obj.occurred_at)}</span>` : ''}
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-1.5">
-                    ${(obj.fields || []).map(renderField).join('')}
-                </div>
-                ${renderFlags(obj.status_flags || [])}
-            </section>
-        `;
+    function renderObjectCard(obj, objIdx, typeFlag) {
+        return AduCommon.renderObjectCard(obj, objIdx, typeFlag, 'HistoryModule.handleFieldClick');
     }
 
     function renderNotes(notes) {
-        if (!notes || !notes.length) return '';
-        return `
-            <section class="space-y-1">
-                <div class="text-xs font-medium text-jd-text">解析说明</div>
-                <div class="space-y-1">
-                    ${notes.map(note => `
-                        <div class="rounded-lg border border-jd-primaryBorder bg-jd-primaryLight px-3 py-1.5 text-xs text-jd-textSecondary">
-                            ${escapeHtml(note)}
-                        </div>
-                    `).join('')}
-                </div>
-            </section>
-        `;
+        return AduCommon.renderNotes(notes);
     }
 
     // 当前缓存的 ADU 数据（供弹窗使用）
@@ -433,33 +325,24 @@ const HistoryModule = (function() {
         title.textContent = adu.type_flag_name || '应用数据单元';
         badge.textContent = `${aduObjects.length} 个对象`;
 
+        _hl.reset();
+
         content.innerHTML = `
             <div class="space-y-2">
                 <div class="grid grid-cols-5 gap-1.5">
-                    ${[
-                        { label: '方向', value: adu.direction },
-                        { label: '类型标志', value: `${adu.type_flag} / ${adu.type_flag_name}`, mono: true, accent: 'primary' },
-                        { label: '类型来源', value: adu.type_origin_label || '-', accent: adu.type_origin_label === '厂商扩展' ? 'primary' : '' },
-                        { label: '信息对象数', value: adu.info_count, mono: true },
-                        { label: '负载长度', value: `${adu.payload_length}B`, mono: true }
-                    ].map(renderField).join('')}
+                    ${AduCommon.renderAduHeaderFields(adu, 'HistoryModule.handleFieldClick')}
                 </div>
                 ${aduObjects.length ? `
                     <div class="space-y-2">
-                        ${aduObjects.map(renderObjectCard).join('')}
+                        ${aduObjects.map((obj, i) => AduCommon.renderObjectCard(obj, i, adu.type_flag, 'HistoryModule.handleFieldClick')).join('')}
                     </div>
                 ` : `
                     <div class="rounded-lg border border-jd-cardBorder bg-white px-3 py-2 text-sm text-jd-textMuted">
                         当前 ADU 无信息对象，常见于确认、否认或保留命令。
                     </div>
                 `}
-                ${renderNotes(adu.notes)}
-                ${adu.payload_hex ? `
-                <section class="space-y-1">
-                    <div class="text-xs text-jd-textMuted">ADU 负载 HEX</div>
-                    <div class="raw-hex-box hex-display">${SceneModule.formatHex(adu.payload_hex)}</div>
-                </section>
-                ` : ''}
+                ${AduCommon.renderNotes(adu.notes)}
+                ${AduCommon.renderAduHexSection(adu)}
             </div>
         `;
 
@@ -467,6 +350,7 @@ const HistoryModule = (function() {
     }
 
     function closeAduModal() {
+        _hl.clearHexHighlight();
         document.getElementById('aduModal').classList.add('hidden');
     }
 
@@ -608,6 +492,7 @@ const HistoryModule = (function() {
         renderPacketDetail,
         openAduModal,
         closeAduModal,
+        handleFieldClick: _hl.handleFieldClick,
         toggleSaveMenu,
         saveHistory,
         exportHistory

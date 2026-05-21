@@ -198,6 +198,37 @@ body { background: #F1F5F9; }
 }
 .btn-primary:hover { background: #1D4ED8; }
 
+/* ADU Field Click-to-Highlight */
+.adu-field-card[data-clickable="1"] {
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.adu-field-card[data-clickable="1"]:hover {
+    border-color: #FCD34D;
+    background: #FEF9C3;
+}
+.adu-field-card.adu-field-active {
+    border-color: #F59E0B !important;
+    background: #FFFBEB !important;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15);
+}
+
+.hex-byte {
+    transition: background 0.2s ease, padding 0.2s ease;
+    border-radius: 3px;
+    padding: 0 1px;
+}
+.hex-byte-hl {
+    background: #FEF3C7;
+    padding: 1px 3px;
+    animation: hex-pulse 1.8s ease-in-out infinite;
+    box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.3);
+}
+@keyframes hex-pulse {
+    0%, 100% { background: #FEF3C7; }
+    50% { background: #FDE68A; }
+}
+
 .btn-secondary {
     background: white; color: #1E293B; border: 1px solid #E2E8F0;
     transition: all 0.2s ease;

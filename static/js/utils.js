@@ -31,9 +31,7 @@ const UtilsModule = (function() {
     };
 })();
 
-function showToast(msg, type) {
-    UtilsModule.showToast(msg, type);
-}
+const showToast = UtilsModule.showToast;
 
 const ConfirmDialog = (function() {
     let _resolve = null;

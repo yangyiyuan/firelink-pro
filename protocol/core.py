@@ -141,6 +141,7 @@ def parse_adu(adu_bytes: bytes) -> Dict[str, Any]:
         'info_count': info_count,
         'payload_length': len(payload),
         'payload_hex': payload.hex(),
+        'adu_full_hex': adu_bytes.hex(),
         'summary_short': summary_short,
         'objects': objects,
         'notes': notes,
