@@ -42,6 +42,8 @@ try:
         touch_instance,
         update_instance,
     )
+    from fire_alarm_simulator.services.common import now_ms_str as now_ms
+    from fire_alarm_simulator.services.network_config import NetworkConfigStore
 except ModuleNotFoundError:
     from protocol.core import (
         SCENE_CATALOG,
@@ -67,11 +69,8 @@ except ModuleNotFoundError:
         touch_instance,
         update_instance,
     )
-
-
-def now_ms() -> str:
-    now = datetime.datetime.now()
-    return now.strftime('%Y-%m-%d %H:%M:%S.') + f'{now.microsecond // 1000:03d}'
+    from services.common import now_ms_str as now_ms
+    from services.network_config import NetworkConfigStore
 
 
 def is_reloader_process() -> bool:
@@ -83,7 +82,7 @@ def is_main_process() -> bool:
 
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'fire-alarm-simulator-secret-key'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'fire-alarm-simulator-secret-key')
 socketio = SocketIO(app, cors_allowed_origins='*', async_mode='threading')
 
 template_last_modified = {}
@@ -116,15 +115,17 @@ if is_reloader_process():
 
 simulator = FireAlarmSimulator()
 send_history = []
+send_history_lock = threading.Lock()
 max_history = 1000
 HISTORY_DIR = os.path.join(os.path.dirname(__file__), 'data', 'history')
 os.makedirs(HISTORY_DIR, exist_ok=True)
 
 
 def push_history(entry: dict[str, Any]) -> None:
-    send_history.append(entry)
-    if len(send_history) > max_history:
-        send_history.pop(0)
+    with send_history_lock:
+        send_history.append(entry)
+        if len(send_history) > max_history:
+            send_history.pop(0)
 
 
 def record_send_history(result: dict[str, Any]) -> None:
@@ -147,38 +148,7 @@ def record_receive_history(kind: str, host: str, port: int, timestamp: str, prot
     push_history(entry)
 
 
-CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'network_configs.json')
-
-
-def _load_configs() -> tuple[list[dict[str, Any]], int]:
-    if os.path.exists(CONFIG_FILE):
-        try:
-            with open(CONFIG_FILE, 'r', encoding='utf-8') as fh:
-                data = json.load(fh)
-            return data.get('configs', []), data.get('next_id', 1)
-        except Exception:
-            pass
-    return [
-        {
-            'id': 1,
-            'name': '本地测试',
-            'host': '127.0.0.1',
-            'port': 8080,
-            'protocol': 'tcp',
-            'description': '本地开发测试服务器',
-        }
-    ], 2
-
-
-def _save_configs() -> None:
-    try:
-        with open(CONFIG_FILE, 'w', encoding='utf-8') as fh:
-            json.dump({'configs': network_configs, 'next_id': next_config_id}, fh, ensure_ascii=False, indent=2)
-    except Exception as exc:
-        print(f'保存配置文件失败: {exc}')
-
-
-network_configs, next_config_id = _load_configs()
+network_config_store = NetworkConfigStore()
 target_connection = None
 target_lock = threading.Lock()
 auto_scene_state = {
@@ -1044,11 +1014,13 @@ def get_scenes():
 
 @app.route('/api/stats')
 def get_stats():
+    with send_history_lock:
+        history_count = len(send_history)
     result = {
         'total_sent': simulator.stats['total_sent'],
         'running': simulator.running,
         'start_time': simulator.stats['start_time'],
-        'history_count': len(send_history),
+        'history_count': history_count,
         'sequence': sequence_manager.current(),
     }
     print(f'[DEBUG] /api/stats => {json.dumps(result, ensure_ascii=False)}')
@@ -1080,30 +1052,33 @@ def reset_sequence():
 @app.route('/api/history')
 def get_history():
     limit = request.args.get('limit', 50, type=int)
-    result = send_history[-limit:]
+    with send_history_lock:
+        result = list(send_history[-limit:])
     print(f'[DEBUG] /api/history (limit={limit}) => {len(result)} 条记录')
     return jsonify(result)
 
 
 @app.route('/api/clear_history', methods=['POST'])
 def clear_history():
-    global send_history
-    send_history = []
+    with send_history_lock:
+        send_history.clear()
     return jsonify({'success': True})
 
 
 @app.route('/api/history/save', methods=['POST'])
 def save_history():
-    if not send_history:
+    with send_history_lock:
+        snapshot = list(send_history)
+    if not snapshot:
         return jsonify({'success': False, 'error': '暂无记录可保存'})
 
     packet_hex_set = set()
-    for r in send_history:
+    for r in snapshot:
         if r.get('history_type') == 'packet' and r.get('parsed', {}).get('raw_hex'):
             packet_hex_set.add(r['parsed']['raw_hex'])
 
     deduped = []
-    for r in send_history:
+    for r in snapshot:
         if r.get('history_type') == 'raw' and r.get('data_hex') and r['data_hex'] in packet_hex_set:
             continue
         deduped.append(r)
@@ -1293,12 +1268,14 @@ def _build_csv_export(records):
 @app.route('/api/history/export')
 def export_history():
     fmt = request.args.get('format', 'json')
-    if not send_history:
+    with send_history_lock:
+        snapshot = list(send_history)
+    if not snapshot:
         return '', 204
     if fmt == 'json':
-        return _build_json_export(send_history)
+        return _build_json_export(snapshot)
     elif fmt == 'csv':
-        return _build_csv_export(send_history)
+        return _build_csv_export(snapshot)
     else:
         return jsonify({'error': '无效的导出格式，支持 json 或 csv'}), 400
 
@@ -1332,12 +1309,12 @@ def export_saved_history(history_id):
 
 @app.route('/api/network_configs', methods=['GET'])
 def get_network_configs():
-    return jsonify(network_configs)
+    return jsonify(network_config_store.list_all())
 
 
 @app.route('/api/network_configs/<int:config_id>', methods=['GET'])
 def get_network_config(config_id: int):
-    config = next((c for c in network_configs if c['id'] == config_id), None)
+    config = network_config_store.get(config_id)
     if config:
         return jsonify(config)
     return jsonify({'error': '配置不存在'}), 404
@@ -1345,57 +1322,27 @@ def get_network_config(config_id: int):
 
 @app.route('/api/network_configs', methods=['POST'])
 def create_network_config():
-    global next_config_id
     data = request.get_json()
     if not data.get('name') or not data.get('host') or not data.get('port'):
         return jsonify({'error': '缺少必要参数'}), 400
-
-    new_config = {
-        'id': next_config_id,
-        'name': data['name'],
-        'host': data['host'],
-        'port': int(data['port']),
-        'protocol': data.get('protocol', 'tcp'),
-        'description': data.get('description', ''),
-    }
-    network_configs.append(new_config)
-    next_config_id += 1
-    _save_configs()
+    new_config = network_config_store.create(data)
     return jsonify(new_config), 201
 
 
 @app.route('/api/network_configs/<int:config_id>', methods=['PUT'])
 def update_network_config(config_id: int):
     data = request.get_json()
-    config = next((c for c in network_configs if c['id'] == config_id), None)
+    config = network_config_store.update(config_id, data)
     if not config:
         return jsonify({'error': '配置不存在'}), 404
-
-    if 'name' in data:
-        config['name'] = data['name']
-    if 'host' in data:
-        config['host'] = data['host']
-    if 'port' in data:
-        config['port'] = int(data['port'])
-    if 'protocol' in data:
-        config['protocol'] = data['protocol']
-    if 'description' in data:
-        config['description'] = data['description']
-
-    _save_configs()
     return jsonify(config)
 
 
 @app.route('/api/network_configs/<int:config_id>', methods=['DELETE'])
 def delete_network_config(config_id: int):
-    global network_configs
-    config = next((c for c in network_configs if c['id'] == config_id), None)
-    if not config:
-        return jsonify({'error': '配置不存在'}), 404
-
-    network_configs = [c for c in network_configs if c['id'] != config_id]
-    _save_configs()
-    return jsonify({'success': True})
+    if network_config_store.delete(config_id):
+        return jsonify({'success': True})
+    return jsonify({'error': '配置不存在'}), 404
 
 
 if __name__ == '__main__':

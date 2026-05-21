@@ -1,5 +1,3 @@
-import copy
-import datetime
 import json
 import os
 import uuid
@@ -12,6 +10,7 @@ try:
         GBT26875Packet,
         build_packet_view,
     )
+    from fire_alarm_simulator.services.common import deep_copy, now_str, parse_int
 except ModuleNotFoundError:
     from protocol.core import (
         SCENE_CATALOG,
@@ -19,6 +18,7 @@ except ModuleNotFoundError:
         GBT26875Packet,
         build_packet_view,
     )
+    from services.common import deep_copy, now_str, parse_int
 
 
 SERVICE_DIR = os.path.dirname(os.path.dirname(__file__))
@@ -55,14 +55,6 @@ def _get_simulator() -> FireAlarmSimulator:
     return _simulator
 
 
-def _copy(value: Any) -> Any:
-    return copy.deepcopy(value)
-
-
-def _now_str() -> str:
-    return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-
 def _load_instances() -> List[Dict[str, Any]]:
     if not os.path.exists(INSTANCE_FILE):
         return []
@@ -79,29 +71,12 @@ def _save_instances(instances: List[Dict[str, Any]]) -> None:
         json.dump(
             {
                 'instances': instances,
-                'updated_at': _now_str(),
+                'updated_at': now_str(),
             },
             fh,
             ensure_ascii=False,
             indent=2,
         )
-
-
-def _parse_int(value: Any, default: Optional[int] = None) -> int:
-    if value is None or value == '':
-        if default is None:
-            raise ValueError('不能为空')
-        return default
-    if isinstance(value, bool):
-        return int(value)
-    if isinstance(value, int):
-        return value
-    text = str(value).strip()
-    if not text:
-        if default is None:
-            raise ValueError('不能为空')
-        return default
-    return int(text, 0)
 
 
 def _validate_device_params(params: Dict[str, Any]) -> Dict[str, Any]:
@@ -123,7 +98,7 @@ def _validate_device_params(params: Dict[str, Any]) -> Dict[str, Any]:
                 raise ValueError(f'deviceParams.{key} 不能为空字符串')
         else:
             try:
-                normalized[key] = _parse_int(val)
+                normalized[key] = parse_int(val)
             except (ValueError, TypeError):
                 raise ValueError(f'deviceParams.{key} 必须是整数')
     return normalized
@@ -181,19 +156,19 @@ def _parse_addr(value: Any) -> int:
 
 def get_scene_catalog_item(template_id: str) -> Optional[Dict[str, Any]]:
     item = _SCENE_MAP.get(template_id)
-    return _copy(item) if item else None
+    return deep_copy(item) if item else None
 
 
 def list_instances() -> List[Dict[str, Any]]:
     instances = _load_instances()
     instances.sort(key=lambda x: x.get('lastUsedAt') or x.get('updatedAt') or x.get('createdAt') or '', reverse=True)
-    return _copy(instances)
+    return deep_copy(instances)
 
 
 def get_instance(instance_id: str) -> Optional[Dict[str, Any]]:
     for inst in _load_instances():
         if inst.get('id') == instance_id:
-            return _copy(inst)
+            return deep_copy(inst)
     return None
 
 
@@ -218,7 +193,7 @@ def create_instance(data: Dict[str, Any]) -> Dict[str, Any]:
     if len(description) > INSTANCE_DESC_MAX:
         raise ValueError(f'描述不能超过 {INSTANCE_DESC_MAX} 字符')
 
-    now = _now_str()
+    now = now_str()
     instance: Dict[str, Any] = {
         'id': f'inst_{uuid.uuid4().hex[:8]}',
         'name': name,
@@ -238,7 +213,7 @@ def create_instance(data: Dict[str, Any]) -> Dict[str, Any]:
     instances = _load_instances()
     instances.append(instance)
     _save_instances(instances)
-    return _copy(instance)
+    return deep_copy(instance)
 
 
 def update_instance(instance_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -284,10 +259,10 @@ def update_instance(instance_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         existing['templateId'] = template_id
         existing['templateSnapshot'] = _build_snapshot(catalog_item)
 
-    existing['updatedAt'] = _now_str()
+    existing['updatedAt'] = now_str()
     instances[target_index] = existing
     _save_instances(instances)
-    return _copy(existing)
+    return deep_copy(existing)
 
 
 def delete_instance(instance_id: str) -> bool:
@@ -303,10 +278,52 @@ def touch_instance(instance_id: str) -> None:
     instances = _load_instances()
     for inst in instances:
         if inst.get('id') == instance_id:
-            inst['lastUsedAt'] = _now_str()
+            inst['lastUsedAt'] = now_str()
             inst['useCount'] = inst.get('useCount', 0) + 1
             break
     _save_instances(instances)
+
+
+_PATCH_FIELD_DEFS = {
+    1: [
+        ('systemType', 0, 1), ('systemAddr', 1, 1), ('systemStatus', 2, 2),
+    ],
+    2: [
+        ('systemType', 0, 1), ('systemAddr', 1, 1), ('componentType', 2, 1),
+        ('zoneNo', 3, 2), ('bitNo', 5, 2), ('componentStatus', 7, 2),
+    ],
+    3: [
+        ('systemType', 0, 1), ('systemAddr', 1, 1), ('componentType', 2, 1),
+        ('zoneNo', 3, 2), ('bitNo', 5, 2),
+    ],
+    4: [
+        ('systemType', 0, 1), ('systemAddr', 1, 1),
+    ],
+    5: [
+        ('systemType', 0, 1), ('systemAddr', 1, 1),
+    ],
+    7: [
+        ('systemType', 0, 1), ('systemAddr', 1, 1), ('componentType', 2, 1),
+        ('zoneNo', 3, 2), ('bitNo', 5, 2),
+    ],
+    8: [
+        ('systemType', 0, 1), ('systemAddr', 1, 1),
+    ],
+    21: [
+        ('statusByte', 0, 1),
+    ],
+}
+
+_PATCH_OBJ_SIZES = {
+    1: 2 + 2 + 6,
+    2: 8 + 4 + 2 + 31 + 6,
+    3: 10 + 6,
+    4: 2 + 2 + 6,
+    5: 2 + 6 + 2,
+    7: 8 + 31 + 6,
+    8: 2 + 6 + 6,
+    21: 1 + 6 + 6,
+}
 
 
 def _patch_packet_adu(packet: bytes, template_id: str, device: Dict[str, Any]) -> bytes:
@@ -320,111 +337,40 @@ def _patch_packet_adu(packet: bytes, template_id: str, device: Dict[str, Any]) -
     type_flag = adu[0]
     info_count = adu[1]
 
+    field_defs = _PATCH_FIELD_DEFS.get(type_flag)
+    obj_size = _PATCH_OBJ_SIZES.get(type_flag)
+
+    if type_flag == 6:
+        field_defs = [('systemType', 0, 1), ('systemAddr', 1, 1)]
+
+    if field_defs is None or obj_size is None:
+        if type_flag != 6:
+            new_control_unit = bytes(pkt[2:27])
+            new_adu = bytes(pkt[adu_start:adu_start + adu_length])
+            checksum = GBT26875Packet(0, 0)._calc_checksum(new_control_unit + new_adu)
+            pkt[adu_start + adu_length] = checksum
+            return bytes(pkt)
+
     obj_offset = 2
     for _ in range(info_count):
-        if type_flag == 2:
-            if obj_offset + 8 > len(adu):
-                break
-            if 'systemType' in device and device['systemType'] is not None:
-                pkt[adu_start + obj_offset] = int(device['systemType']) & 0xFF
-            if 'systemAddr' in device and device['systemAddr'] is not None:
-                pkt[adu_start + obj_offset + 1] = int(device['systemAddr']) & 0xFF
-            if 'componentType' in device and device['componentType'] is not None:
-                pkt[adu_start + obj_offset + 2] = int(device['componentType']) & 0xFF
-            if 'zoneNo' in device and device['zoneNo'] is not None:
-                zone_no = int(device['zoneNo'])
-                pkt[adu_start + obj_offset + 3] = zone_no & 0xFF
-                pkt[adu_start + obj_offset + 4] = (zone_no >> 8) & 0xFF
-            if 'bitNo' in device and device['bitNo'] is not None:
-                bit_no = int(device['bitNo'])
-                pkt[adu_start + obj_offset + 5] = bit_no & 0xFF
-                pkt[adu_start + obj_offset + 6] = (bit_no >> 8) & 0xFF
-            if 'componentStatus' in device and device['componentStatus'] is not None:
-                sv = int(device['componentStatus'])
-                pkt[adu_start + obj_offset + 7] = sv & 0xFF
-                pkt[adu_start + obj_offset + 8] = (sv >> 8) & 0xFF
-            obj_offset += 8 + 4 + 2 + 31 + 6
-        elif type_flag == 1:
-            if obj_offset + 4 > len(adu):
-                break
-            if 'systemType' in device and device['systemType'] is not None:
-                pkt[adu_start + obj_offset] = int(device['systemType']) & 0xFF
-            if 'systemAddr' in device and device['systemAddr'] is not None:
-                pkt[adu_start + obj_offset + 1] = int(device['systemAddr']) & 0xFF
-            if 'systemStatus' in device and device['systemStatus'] is not None:
-                sv = int(device['systemStatus'])
-                pkt[adu_start + obj_offset + 2] = sv & 0xFF
-                pkt[adu_start + obj_offset + 3] = (sv >> 8) & 0xFF
-            obj_offset += 2 + 2 + 6
-        elif type_flag == 3:
-            if obj_offset + 10 > len(adu):
-                break
-            if 'systemType' in device and device['systemType'] is not None:
-                pkt[adu_start + obj_offset] = int(device['systemType']) & 0xFF
-            if 'systemAddr' in device and device['systemAddr'] is not None:
-                pkt[adu_start + obj_offset + 1] = int(device['systemAddr']) & 0xFF
-            if 'componentType' in device and device['componentType'] is not None:
-                pkt[adu_start + obj_offset + 2] = int(device['componentType']) & 0xFF
-            if 'zoneNo' in device and device['zoneNo'] is not None:
-                zone_no = int(device['zoneNo'])
-                pkt[adu_start + obj_offset + 3] = zone_no & 0xFF
-                pkt[adu_start + obj_offset + 4] = (zone_no >> 8) & 0xFF
-            if 'bitNo' in device and device['bitNo'] is not None:
-                bit_no = int(device['bitNo'])
-                pkt[adu_start + obj_offset + 5] = bit_no & 0xFF
-                pkt[adu_start + obj_offset + 6] = (bit_no >> 8) & 0xFF
-            obj_offset += 10 + 6
-        elif type_flag == 4:
-            if obj_offset + 4 > len(adu):
-                break
-            if 'systemType' in device and device['systemType'] is not None:
-                pkt[adu_start + obj_offset] = int(device['systemType']) & 0xFF
-            if 'systemAddr' in device and device['systemAddr'] is not None:
-                pkt[adu_start + obj_offset + 1] = int(device['systemAddr']) & 0xFF
-            obj_offset += 2 + 2 + 6
-        elif type_flag in (5, 8):
-            if obj_offset + 2 > len(adu):
-                break
-            if 'systemType' in device and device['systemType'] is not None:
-                pkt[adu_start + obj_offset] = int(device['systemType']) & 0xFF
-            if 'systemAddr' in device and device['systemAddr'] is not None:
-                pkt[adu_start + obj_offset + 1] = int(device['systemAddr']) & 0xFF
-            obj_offset += 2 + 6 + (6 if type_flag == 8 else 2)
-        elif type_flag == 6:
+        if type_flag == 6:
             if obj_offset + 3 > len(adu):
                 break
-            if 'systemType' in device and device['systemType'] is not None:
-                pkt[adu_start + obj_offset] = int(device['systemType']) & 0xFF
-            if 'systemAddr' in device and device['systemAddr'] is not None:
-                pkt[adu_start + obj_offset + 1] = int(device['systemAddr']) & 0xFF
             text_len = adu[obj_offset + 2]
-            obj_offset += 3 + text_len + 6
-        elif type_flag == 7:
-            if obj_offset + 8 > len(adu):
-                break
-            if 'systemType' in device and device['systemType'] is not None:
-                pkt[adu_start + obj_offset] = int(device['systemType']) & 0xFF
-            if 'systemAddr' in device and device['systemAddr'] is not None:
-                pkt[adu_start + obj_offset + 1] = int(device['systemAddr']) & 0xFF
-            if 'componentType' in device and device['componentType'] is not None:
-                pkt[adu_start + obj_offset + 2] = int(device['componentType']) & 0xFF
-            if 'zoneNo' in device and device['zoneNo'] is not None:
-                zone_no = int(device['zoneNo'])
-                pkt[adu_start + obj_offset + 3] = zone_no & 0xFF
-                pkt[adu_start + obj_offset + 4] = (zone_no >> 8) & 0xFF
-            if 'bitNo' in device and device['bitNo'] is not None:
-                bit_no = int(device['bitNo'])
-                pkt[adu_start + obj_offset + 5] = bit_no & 0xFF
-                pkt[adu_start + obj_offset + 6] = (bit_no >> 8) & 0xFF
-            obj_offset += 8 + 31 + 6
-        elif type_flag == 21:
-            if obj_offset + 1 > len(adu):
-                break
-            if 'statusByte' in device and device['statusByte'] is not None:
-                pkt[adu_start + obj_offset] = int(device['statusByte']) & 0xFF
-            obj_offset += 1 + 6 + 6
-        else:
+            obj_size = 3 + text_len + 6
+
+        min_offset = max((off + size) for _, off, size in field_defs) if field_defs else 0
+        if obj_offset + min_offset > len(adu):
             break
+
+        for field_name, rel_off, byte_count in field_defs:
+            val = device.get(field_name)
+            if val is not None:
+                iv = int(val)
+                for b in range(byte_count):
+                    pkt[adu_start + obj_offset + rel_off + b] = (iv >> (8 * b)) & 0xFF
+
+        obj_offset += obj_size
 
     new_control_unit = bytes(pkt[2:27])
     new_adu = bytes(pkt[adu_start:adu_start + adu_length])
@@ -466,7 +412,7 @@ def preview_instance(instance_id: str) -> Dict[str, Any]:
         raise ValueError(f'实例 {instance_id} 不存在')
 
     packet = resolve_instance_packet(instance)
-    packet_view = build_packet_view(packet, scene=instance.get('templateId', ''), timestamp=_now_str())
+    packet_view = build_packet_view(packet, scene=instance.get('templateId', ''), timestamp=now_str())
 
     return {
         'success': True,

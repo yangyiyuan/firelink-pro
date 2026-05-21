@@ -1,4 +1,3 @@
-import copy
 import datetime
 import json
 import os
@@ -20,6 +19,7 @@ try:
         DEVICE_STATUS_BITS,
         SYSTEM_STATUS_BITS,
     )
+    from fire_alarm_simulator.services.common import deep_copy, now_str, parse_int
 except ModuleNotFoundError:
     from protocol.core import ADUBuilder, GBT26875Packet, build_packet_view
     from protocol.shared import (
@@ -35,6 +35,7 @@ except ModuleNotFoundError:
         DEVICE_STATUS_BITS,
         SYSTEM_STATUS_BITS,
     )
+    from services.common import deep_copy, now_str, parse_int
 
 
 OBJECT_TYPE_META = {
@@ -96,32 +97,11 @@ SERVICE_DIR = os.path.dirname(os.path.dirname(__file__))
 TEMPLATE_FILE = os.path.join(SERVICE_DIR, 'auto_send_templates.json')
 
 
-def _copy(value: Any) -> Any:
-    return copy.deepcopy(value)
-
-
 def _field_error(step_index: int, object_index: int | None, field_path: str, message: str) -> ValueError:
     prefix = f'步骤{step_index + 1}'
     if object_index is not None:
         prefix += f'-对象{object_index + 1}'
     return ValueError(f'{prefix} {message} ({field_path})')
-
-
-def _parse_int(value: Any, default: int | None = None) -> int:
-    if value is None or value == '':
-        if default is None:
-            raise ValueError('不能为空')
-        return default
-    if isinstance(value, bool):
-        return int(value)
-    if isinstance(value, int):
-        return value
-    text = str(value).strip()
-    if not text:
-        if default is None:
-            raise ValueError('不能为空')
-        return default
-    return int(text, 0)
 
 
 def _parse_occured_at(fields: Dict[str, Any]) -> datetime.datetime | None:
@@ -410,16 +390,16 @@ def get_auto_send_meta() -> Dict[str, Any]:
             {'value': key, 'label': meta['label']}
             for key, meta in OBJECT_TYPE_META.items()
         ],
-        'compatibility': _copy(TYPE_FLAG_OBJECT_COMPATIBILITY),
+        'compatibility': deep_copy(TYPE_FLAG_OBJECT_COMPATIBILITY),
         'statusPresets': {
-            'component_status': _copy(COMPONENT_STATUS_PRESETS),
-            'system_status': _copy(SYSTEM_STATUS_PRESETS),
-            'device_status': _copy(DEVICE_STATUS_PRESETS),
+            'component_status': deep_copy(COMPONENT_STATUS_PRESETS),
+            'system_status': deep_copy(SYSTEM_STATUS_PRESETS),
+            'device_status': deep_copy(DEVICE_STATUS_PRESETS),
         },
         'statusBits': {
-            'component_status': _copy(COMPONENT_STATUS_BITS),
-            'system_status': _copy(SYSTEM_STATUS_BITS),
-            'device_status': _copy(DEVICE_STATUS_BITS),
+            'component_status': deep_copy(COMPONENT_STATUS_BITS),
+            'system_status': deep_copy(SYSTEM_STATUS_BITS),
+            'device_status': deep_copy(DEVICE_STATUS_BITS),
         },
         'categories': CATEGORY_OPTIONS,
         'categoryDefaults': CATEGORY_DEFAULTS,
@@ -429,7 +409,7 @@ def get_auto_send_meta() -> Dict[str, Any]:
 
 def list_templates() -> List[Dict[str, Any]]:
     templates = _system_templates() + _load_user_templates()
-    return _copy(templates)
+    return deep_copy(templates)
 
 
 def get_template(template_id: str) -> Dict[str, Any] | None:
@@ -441,7 +421,7 @@ def get_template(template_id: str) -> Dict[str, Any] | None:
 
 def save_template(scene: Dict[str, Any], template_id: str | None = None) -> Dict[str, Any]:
     user_templates = _load_user_templates()
-    payload = _copy(scene)
+    payload = deep_copy(scene)
     payload['steps'] = payload.get('steps') or []
     payload['name'] = (payload.get('name') or '').strip() or '未命名模板'
     payload['category'] = payload.get('category') or 'custom'
@@ -455,12 +435,12 @@ def save_template(scene: Dict[str, Any], template_id: str | None = None) -> Dict
                 payload['id'] = template_id
                 user_templates[index] = payload
                 _save_user_templates(user_templates)
-                return _copy(payload)
+                return deep_copy(payload)
 
     payload['id'] = f'user_{uuid.uuid4().hex[:10]}'
     user_templates.append(payload)
     _save_user_templates(user_templates)
-    return _copy(payload)
+    return deep_copy(payload)
 
 
 def delete_template(template_id: str) -> bool:
@@ -474,11 +454,11 @@ def delete_template(template_id: str) -> bool:
 
 def _component_addr_from_fields(fields: Dict[str, Any]) -> int:
     """从位号+区号计算部件地址(4B LE): 位号(2B) + 区号(2B)"""
-    bit_no = _parse_int(fields.get('bitNo'), 1)
-    zone_no = _parse_int(fields.get('zoneNo'), 1)
+    bit_no = parse_int(fields.get('bitNo'), 1)
+    zone_no = parse_int(fields.get('zoneNo'), 1)
     # 兼容旧数据: 如果直接传了 componentAddr 则优先使用
     if 'componentAddr' in fields and fields.get('componentAddr') not in (None, ''):
-        return _parse_int(fields.get('componentAddr'), 1)
+        return parse_int(fields.get('componentAddr'), 1)
     return bit_no | (zone_no << 16)
 
 
@@ -487,33 +467,33 @@ def _build_object_bytes(object_type: str, fields: Dict[str, Any], step_index: in
     occurred_at = _parse_occured_at(fields)
     if object_type == 'system_status':
         return builder.build_system_status(
-            _parse_int(fields.get('systemType'), 1),
-            _parse_int(fields.get('systemAddr'), 1),
-            _parse_int(fields.get('systemStatus'), 0),
+            parse_int(fields.get('systemType'), 1),
+            parse_int(fields.get('systemAddr'), 1),
+            parse_int(fields.get('systemStatus'), 0),
             occurred_at,
         )
     if object_type == 'analog_value':
         return builder.build_analog_value(
-            _parse_int(fields.get('systemType'), 1),
-            _parse_int(fields.get('systemAddr'), 1),
-            _parse_int(fields.get('componentType'), 31),
+            parse_int(fields.get('systemType'), 1),
+            parse_int(fields.get('systemAddr'), 1),
+            parse_int(fields.get('componentType'), 31),
             _component_addr_from_fields(fields),
-            _parse_int(fields.get('analogType'), 3),
-            _parse_int(fields.get('analogValue'), 0),
+            parse_int(fields.get('analogType'), 3),
+            parse_int(fields.get('analogValue'), 0),
             occurred_at,
         )
     if object_type == 'device_status':
         return builder.build_device_status(
-            _parse_int(fields.get('statusByte'), 0),
+            parse_int(fields.get('statusByte'), 0),
             occurred_at,
         )
     if object_type == 'component_status':
         return builder.build_component_status(
-            _parse_int(fields.get('systemType'), 1),
-            _parse_int(fields.get('systemAddr'), 1),
-            _parse_int(fields.get('componentType'), 42),
+            parse_int(fields.get('systemType'), 1),
+            parse_int(fields.get('systemAddr'), 1),
+            parse_int(fields.get('componentType'), 42),
             _component_addr_from_fields(fields),
-            _parse_int(fields.get('componentStatus'), 0),
+            parse_int(fields.get('componentStatus'), 0),
             str(fields.get('description') or ''),
             occurred_at,
         )
@@ -522,15 +502,15 @@ def _build_object_bytes(object_type: str, fields: Dict[str, Any], step_index: in
 
 def _normalize_step(step: Dict[str, Any], step_index: int, scene_name: str) -> Dict[str, Any]:
     header = step.get('packetHeader') or {}
-    type_flag = _parse_int(header.get('typeFlag'), 2)
+    type_flag = parse_int(header.get('typeFlag'), 2)
     if type_flag not in TYPE_FLAG_OBJECT_COMPATIBILITY:
         raise _field_error(step_index, None, f'steps[{step_index}].packetHeader.typeFlag', f'暂不支持的类型标志 {type_flag}')
 
     allowed_object_types = TYPE_FLAG_OBJECT_COMPATIBILITY[type_flag]
-    command = _parse_int(header.get('command'), 2)
-    source_addr = _parse_int(header.get('sourceAddr'), 0x000000000001)
-    dest_addr = _parse_int(header.get('destAddr'), 0x000000000002)
-    delay_after_sec = max(0, _parse_int(step.get('delayAfterSec'), 5))
+    command = parse_int(header.get('command'), 2)
+    source_addr = parse_int(header.get('sourceAddr'), 0x000000000001)
+    dest_addr = parse_int(header.get('destAddr'), 0x000000000002)
+    delay_after_sec = max(0, parse_int(step.get('delayAfterSec'), 5))
     name = (step.get('name') or '').strip() or f'步骤{step_index + 1}'
 
     objects = step.get('objects') or []
@@ -563,7 +543,7 @@ def _normalize_step(step: Dict[str, Any], step_index: int, scene_name: str) -> D
             {
                 'id': obj.get('id') or f'obj_{object_index + 1}',
                 'objectType': object_type,
-                'fields': _copy(fields),
+                'fields': deep_copy(fields),
             }
         )
 
@@ -593,7 +573,7 @@ def _normalize_step(step: Dict[str, Any], step_index: int, scene_name: str) -> D
 
 
 def build_scene_plan(scene: Dict[str, Any]) -> Dict[str, Any]:
-    payload = _copy(scene or {})
+    payload = deep_copy(scene or {})
     scene_name = (payload.get('name') or '').strip() or '未命名场景'
     steps = payload.get('steps') or []
     if not steps:
