@@ -325,9 +325,8 @@ const HistoryModule = (function() {
     }
 
     function getObjectSeverity(obj) {
-        const summary = String(obj?.summary || '');
         const active = (obj?.status_flags || []).filter(flag => flag.active).map(flag => flag.on);
-        const keywords = `${summary} ${active.join(' ')}`;
+        const keywords = active.join(' ');
         if (/火警|报警/.test(keywords)) return 'alarm';
         if (/故障/.test(keywords)) return 'fault';
         if (/恢复/.test(keywords)) return 'recovery';

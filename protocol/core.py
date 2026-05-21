@@ -446,12 +446,8 @@ class FireAlarmSimulator:
 
     def scene_confirmed_fire_alarm(self, system_addr: Optional[int] = None) -> bytes:
         system_addr = system_addr or self._generate_random_addr()
-        info_objects = [
-            self.adu_builder.build_component_status(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_PHOTO_SMOKE, 0x00010001, 0x0002, 'A区1层大厅烟感01'),
-            self.adu_builder.build_component_status(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_HEAT_DETECTOR, 0x00010002, 0x0002, 'A区1层大厅温感02'),
-            self.adu_builder.build_component_status(SystemType.FIRE_ALARM, system_addr, ComponentType.MANUAL_ALARM_BUTTON, 0x00010003, 0x0002, 'A区1层大厅手报03'),
-        ]
-        adu = self.adu_builder.build_adu(TypeFlag.UP_COMPONENT_STATUS, info_objects)
+        obj = self.adu_builder.build_component_status(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_PHOTO_SMOKE, 0x00010001, 0x0002, 'A区1层大厅烟感01')
+        adu = self.adu_builder.build_adu(TypeFlag.UP_COMPONENT_STATUS, [obj])
         return self.packet_builder.build_packet(adu)
 
     def scene_fault_alarm(self, system_addr: Optional[int] = None) -> bytes:
@@ -462,38 +458,25 @@ class FireAlarmSimulator:
 
     def scene_composite_alarm(self, system_addr: Optional[int] = None) -> bytes:
         system_addr = system_addr or self._generate_random_addr()
-        info_objects = [
-            self.adu_builder.build_component_status(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_PHOTO_SMOKE, 0x00020001, 0x0002, 'B区2层烟感火警'),
-            self.adu_builder.build_component_status(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_HEAT_DETECTOR, 0x00020002, 0x0004, 'B区2层温感故障'),
-        ]
-        adu = self.adu_builder.build_adu(TypeFlag.UP_COMPONENT_STATUS, info_objects)
+        obj = self.adu_builder.build_component_status(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_PHOTO_SMOKE, 0x00020001, 0x0002, 'B区2层烟感火警')
+        adu = self.adu_builder.build_adu(TypeFlag.UP_COMPONENT_STATUS, [obj])
         return self.packet_builder.build_packet(adu)
 
     def scene_analog_overlimit(self, system_addr: Optional[int] = None) -> bytes:
         system_addr = system_addr or self._generate_random_addr()
-        info_objects = [
-            self.adu_builder.build_analog_value(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_HEAT_DETECTOR, 0x00030001, AnalogType.TEMPERATURE, 850),
-            self.adu_builder.build_analog_value(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_PHOTO_SMOKE, 0x00030002, AnalogType.EVENT_COUNT, 150),
-        ]
-        adu = self.adu_builder.build_adu(TypeFlag.UP_ANALOG_VALUE, info_objects)
+        obj = self.adu_builder.build_analog_value(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_HEAT_DETECTOR, 0x00030001, AnalogType.TEMPERATURE, 850)
+        adu = self.adu_builder.build_adu(TypeFlag.UP_ANALOG_VALUE, [obj])
         return self.packet_builder.build_packet(adu)
 
     def scene_operation_info(self, system_addr: Optional[int] = None) -> bytes:
         """消防设施操作信息（TF=4）
 
-        模拟典型操作场景：复位 + 消音 + 确认
+        模拟确认操作场景
         操作标志位定义见 standard.FACILITY_OPERATION_BITS
         """
         system_addr = system_addr or self._generate_random_addr()
-        info_objects = [
-            # 火灾报警系统 - 确认操作（bit5=1 → 0x20）
-            self.adu_builder.build_operation_info(SystemType.FIRE_ALARM, system_addr, 0x20, 1),
-            # 消防联动控制器 - 复位操作（bit0=1 → 0x01）
-            self.adu_builder.build_operation_info(SystemType.FIRE_LINKAGE, system_addr, 0x01, 2),
-            # 火灾报警系统 - 消音操作（bit1=1 → 0x02）
-            self.adu_builder.build_operation_info(SystemType.FIRE_ALARM, system_addr, 0x02, 1),
-        ]
-        adu = self.adu_builder.build_adu(TypeFlag.UP_OPERATION_INFO, info_objects)
+        obj = self.adu_builder.build_operation_info(SystemType.FIRE_ALARM, system_addr, 0x20, 1)
+        adu = self.adu_builder.build_adu(TypeFlag.UP_OPERATION_INFO, [obj])
         return self.packet_builder.build_packet(adu)
 
     def scene_system_fire_alarm(self, system_addr: Optional[int] = None) -> bytes:
@@ -505,14 +488,11 @@ class FireAlarmSimulator:
     def scene_system_version(self, system_addr: Optional[int] = None) -> bytes:
         """消防设施软件版本（TF=5）
 
-        模拟多系统版本上报：火灾报警系统V3.2、消防联动控制器V2.1
+        模拟火灾报警系统版本上报
         """
         system_addr = system_addr or self._generate_random_addr()
-        info_objects = [
-            self.adu_builder.build_system_version(SystemType.FIRE_ALARM, system_addr, 3, 2),
-            self.adu_builder.build_system_version(SystemType.FIRE_LINKAGE, system_addr, 2, 1),
-        ]
-        adu = self.adu_builder.build_adu(TypeFlag.UP_SOFTWARE_VERSION, info_objects)
+        obj = self.adu_builder.build_system_version(SystemType.FIRE_ALARM, system_addr, 3, 2)
+        adu = self.adu_builder.build_adu(TypeFlag.UP_SOFTWARE_VERSION, [obj])
         return self.packet_builder.build_packet(adu)
 
     def scene_device_version(self) -> bytes:
@@ -545,53 +525,41 @@ class FireAlarmSimulator:
     def scene_system_config(self, system_addr: Optional[int] = None) -> bytes:
         """消防设施系统配置（TF=6）
 
-        模拟典型配置上报：火灾报警系统和消防联动控制器的配置说明
+        模拟火灾报警系统配置上报
         """
         system_addr = system_addr or self._generate_random_addr()
-        info_objects = [
-            self.adu_builder.build_system_config(SystemType.FIRE_ALARM, system_addr, '1号楼火灾报警控制器，3回路，每回路128点'),
-            self.adu_builder.build_system_config(SystemType.FIRE_LINKAGE, system_addr, 'A区消防联动控制器，16路输入输出'),
-        ]
-        adu = self.adu_builder.build_adu(TypeFlag.UP_SYSTEM_CONFIG, info_objects)
+        obj = self.adu_builder.build_system_config(SystemType.FIRE_ALARM, system_addr, '1号楼火灾报警控制器，3回路，每回路128点')
+        adu = self.adu_builder.build_adu(TypeFlag.UP_SYSTEM_CONFIG, [obj])
         return self.packet_builder.build_packet(adu)
 
     def scene_component_config(self, system_addr: Optional[int] = None) -> bytes:
         """消防设施部件配置（TF=7）
 
-        模拟典型部件配置上报：烟感和温感探测器的配置说明
+        模拟烟感探测器配置上报
         """
         system_addr = system_addr or self._generate_random_addr()
-        info_objects = [
-            self.adu_builder.build_component_config(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_PHOTO_SMOKE, 0x00010001, '1号楼3层走廊光电烟感01'),
-            self.adu_builder.build_component_config(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_HEAT_DETECTOR, 0x00010002, '1号楼3层走廊点型温感02'),
-        ]
-        adu = self.adu_builder.build_adu(TypeFlag.UP_COMPONENT_CONFIG, info_objects)
+        obj = self.adu_builder.build_component_config(SystemType.FIRE_ALARM, system_addr, ComponentType.POINT_PHOTO_SMOKE, 0x00010001, '1号楼3层走廊光电烟感01')
+        adu = self.adu_builder.build_adu(TypeFlag.UP_COMPONENT_CONFIG, [obj])
         return self.packet_builder.build_packet(adu)
 
     def scene_system_time(self, system_addr: Optional[int] = None) -> bytes:
         """消防设施系统时间（TF=8）
 
-        模拟多系统时间上报：火灾报警系统和消防联动控制器的系统时间
+        模拟火灾报警系统时间上报
         """
         system_addr = system_addr or self._generate_random_addr()
-        info_objects = [
-            self.adu_builder.build_system_time(SystemType.FIRE_ALARM, system_addr),
-            self.adu_builder.build_system_time(SystemType.FIRE_LINKAGE, system_addr),
-        ]
-        adu = self.adu_builder.build_adu(TypeFlag.UP_SYSTEM_TIME, info_objects)
+        obj = self.adu_builder.build_system_time(SystemType.FIRE_ALARM, system_addr)
+        adu = self.adu_builder.build_adu(TypeFlag.UP_SYSTEM_TIME, [obj])
         return self.packet_builder.build_packet(adu)
 
     def scene_device_operation(self) -> bytes:
         """传输装置操作信息（TF=24）
 
-        模拟典型操作：复位 + 消音，末尾附ADU级时间标签
+        模拟确认操作，末尾附ADU级时间标签
         操作标志位定义见 standard.DEVICE_OPERATION_BITS
         """
         info_objects = [
-            # 复位操作（bit0=1 → 0x01），操作员3
-            bytes([0x01, 3]) + self.adu_builder._get_time_tag(),
-            # 消音操作（bit1=1 → 0x02），操作员1
-            bytes([0x02, 1]) + self.adu_builder._get_time_tag(),
+            bytes([0x20, 1]) + self.adu_builder._get_time_tag(),
         ]
         adu = self.adu_builder.build_adu_with_time_tag(TypeFlag.UP_DEVICE_OPERATION, info_objects)
         return self.packet_builder.build_packet(adu)
