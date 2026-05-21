@@ -261,6 +261,33 @@ body { background: #F1F5F9; }
     border-color: #BFDBFE;
 }
 
+/* Scene Tab Buttons - Segmented Control */
+.scene-tab-group {
+    background: #F1F5F9;
+    border-radius: 8px;
+    padding: 2px;
+    gap: 2px !important;
+}
+.scene-tab-btn {
+    background: transparent;
+    color: #94A3B8;
+    border: none;
+    cursor: pointer;
+    border-radius: 6px;
+    position: relative;
+    z-index: 1;
+    transition: color 0.2s ease, background 0.25s ease, box-shadow 0.25s ease;
+}
+.scene-tab-btn:hover {
+    color: #475569;
+    background: rgba(255,255,255,0.5);
+}
+.scene-tab-btn.active {
+    background: #FFFFFF;
+    color: #1E293B;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+}
+
 /* Flatpickr Theme Override - 与 jd-input 设计系统统一 */
 .flatpickr-calendar {
     font-family: 'Noto Sans SC', system-ui, sans-serif !important;

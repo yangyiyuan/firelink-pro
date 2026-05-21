@@ -9,6 +9,7 @@ const PanelModule = (function() {
         document.getElementById('scenePanel')?.classList.add('hidden');
         document.getElementById('networkPanel')?.classList.add('hidden');
         document.getElementById('autoScenePanel')?.classList.add('hidden');
+        document.getElementById('signalInstancePanel')?.classList.add('hidden');
     }
 
     function showPanel(name) {
@@ -28,10 +29,21 @@ const PanelModule = (function() {
             document.getElementById('mainTitle').textContent = '场景编排';
             document.getElementById('breadcrumbScene').textContent = '自动发送场景编排';
             document.getElementById('connectionStatus').style.display = 'none';
-            if (window.AutoSendModule?.refreshPageState) {
-                window.AutoSendModule.refreshPageState();
+            if (typeof AutoSendModule !== 'undefined' && AutoSendModule.refreshPageState) {
+                AutoSendModule.refreshPageState();
             }
             showToast('已切换到场景编排', 'info');
+        } else if (name === 'signalInstance') {
+            setActiveSidebar('sidebarSignalInstanceLink');
+            hideAllPanels();
+            document.getElementById('signalInstancePanel').classList.remove('hidden');
+            document.getElementById('mainTitle').textContent = '信号实例';
+            document.getElementById('breadcrumbScene').textContent = '基于模板的调试实例';
+            document.getElementById('connectionStatus').style.display = 'none';
+            if (typeof SignalInstanceModule !== 'undefined' && SignalInstanceModule.loadInitialData) {
+                SignalInstanceModule.loadInitialData();
+            }
+            showToast('已切换到信号实例', 'info');
         } else if (name === 'scene') {
             setActiveSidebar('sidebarSceneLink');
             hideAllPanels();

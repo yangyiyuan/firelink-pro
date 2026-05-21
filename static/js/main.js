@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     SceneModule.init(globalSocket);
     NetworkModule.init(globalSocket);
     AutoSendModule.init(globalSocket);
+    SignalInstanceModule.init(globalSocket);
     HistoryModule.init(globalSocket);
 
     // 初始化自定义下拉框

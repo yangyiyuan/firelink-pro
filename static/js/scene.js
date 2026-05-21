@@ -182,6 +182,149 @@ const SceneModule = (function() {
     }
 
     let activeFilter = 'all';
+    let activeTab = 'template';
+    let sidebarInstances = [];
+    let sidebarInstanceKeyword = '';
+    let selectedSidebarInstanceId = null;
+
+    function switchTab(tab) {
+        activeTab = tab;
+        document.querySelectorAll('.scene-tab-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === tab);
+        });
+        const filterArea = document.querySelector('.scene-filter-area');
+        const instanceArea = document.querySelector('.scene-instance-area');
+        const sceneListEl = document.getElementById('sceneList');
+        const instanceListEl = document.getElementById('sceneInstanceList');
+        const badge = document.getElementById('sceneCountBadge');
+
+        if (tab === 'template') {
+            if (filterArea) filterArea.classList.remove('hidden');
+            if (instanceArea) instanceArea.classList.add('hidden');
+            if (sceneListEl) sceneListEl.classList.remove('hidden');
+            if (instanceListEl) instanceListEl.classList.add('hidden');
+            const realTemplates = templates.filter(s => s.group !== 'tool');
+            const filteredCount = activeFilter === 'all' ? realTemplates.length : templates.filter(s => s.group === activeFilter && s.group !== 'tool').length;
+            if (badge) badge.textContent = `${filteredCount}个模板`;
+        } else {
+            if (filterArea) filterArea.classList.add('hidden');
+            if (instanceArea) instanceArea.classList.remove('hidden');
+            if (sceneListEl) sceneListEl.classList.add('hidden');
+            if (instanceListEl) instanceListEl.classList.remove('hidden');
+            loadSidebarInstances();
+            if (badge) badge.textContent = `${sidebarInstances.length}个实例`;
+        }
+    }
+
+    async function loadSidebarInstances() {
+        try {
+            const resp = await fetch('/api/signal_instances');
+            sidebarInstances = await resp.json();
+            renderSidebarInstanceList();
+            const badge = document.getElementById('sceneCountBadge');
+            if (badge && activeTab === 'instance') badge.textContent = `${sidebarInstances.length}个实例`;
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
+    function renderSidebarInstanceList() {
+        const list = document.getElementById('sceneInstanceList');
+        if (!list) return;
+
+        const esc = (v) => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+        const kw = sidebarInstanceKeyword.trim().toLowerCase();
+        const filtered = sidebarInstances.filter(item => {
+            if (!kw) return true;
+            return `${item.name || ''} ${item.description || ''} ${(item.tags || []).join(' ')}`.toLowerCase().includes(kw);
+        });
+
+        if (!filtered.length) {
+            list.innerHTML = `<div class="text-center text-jd-textMuted text-sm py-8">${kw ? '未找到匹配实例' : '暂无信号实例，点击模板卡片上的 + 创建'}</div>`;
+            return;
+        }
+
+        const groupMap = { facility: '消防设施', device: '传输装置', tool: '快捷工具' };
+
+        list.innerHTML = filtered.map((inst, idx) => {
+            const tpl = templates.find(t => t.id === inst.templateId);
+            const groupName = tpl ? (groupMap[tpl.group] || '其他') : '';
+            const isActive = inst.id === selectedSidebarInstanceId;
+            const tagHtml = (inst.tags || []).slice(0, 2).map(t => {
+                const display = t.length > 4 ? t.substring(0, 4) + '..' : t;
+                return `<span class="text-[9px] px-1 py-px rounded bg-slate-100 text-slate-400">${esc(display)}</span>`;
+            }).join('');
+            return `
+                <div class="scene-card group relative flex items-start gap-2.5 p-2.5 rounded-lg cursor-pointer transition-all duration-200 mb-1.5 ${isActive ? 'scene-card-active ring-1 ring-emerald-400/30 bg-emerald-50' : 'bg-white border border-jd-cardBorder hover:border-emerald-200 hover:shadow-sm'}"
+                    onclick="SceneModule.selectSidebarInstance('${esc(inst.id)}')"
+                    style="animation: fadeInUp 0.3s ease-out ${idx * 0.04}s both"
+                >
+                    <div class="w-8 h-8 rounded-lg ${isActive ? 'bg-emerald-100 text-emerald-600' : 'bg-emerald-50 text-emerald-500'} flex items-center justify-center shrink-0">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-1.5 mb-0.5">
+                            <span class="text-[13px] font-medium ${isActive ? 'text-emerald-700' : 'text-jd-text'} truncate">${esc(inst.name || '未命名实例')}</span>
+                            <span class="text-[9px] px-1 py-px rounded-full ${isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-50 text-emerald-600'} shrink-0">实例</span>
+                        </div>
+                        <div class="text-[11px] text-jd-textMuted truncate mb-1">${esc(inst.description || tpl?.desc || '无描述')}</div>
+                        <div class="flex items-center gap-1.5">
+                            ${tpl ? `<span class="text-[10px] px-1.5 py-px rounded bg-slate-50 text-slate-400 font-medium">${esc(tpl.name)}</span>` : ''}
+                            ${groupName ? `<span class="text-[10px] text-slate-300">·</span><span class="text-[10px] text-slate-400">${esc(groupName)}</span>` : ''}
+                            ${tagHtml ? `<span class="text-[10px] text-slate-300">·</span>${tagHtml}` : ''}
+                        </div>
+                    </div>
+                    <div class="absolute top-2.5 right-2.5 flex items-center gap-1">
+                        ${isActive ? `<svg class="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function selectSidebarInstance(instanceId) {
+        const inst = sidebarInstances.find(i => i.id === instanceId);
+        if (!inst) return;
+        selectedSidebarInstanceId = instanceId;
+        renderSidebarInstanceList();
+
+        document.getElementById('breadcrumbScene').textContent = inst.name || '未命名实例';
+        const label = document.getElementById('currentSceneName');
+        if (label) {
+            label.textContent = inst.name || '未命名实例';
+            label.className = 'text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600';
+        }
+
+        previewSidebarInstance(instanceId);
+        showToast(`已选择实例: ${inst.name || '未命名实例'}`, 'info');
+    }
+
+    async function previewSidebarInstance(instanceId) {
+        try {
+            const resp = await fetch(`/api/signal_instances/${instanceId}/preview`, { method: 'POST' });
+            const result = await resp.json();
+            if (!result.success) {
+                showToast(result.error || '实例预览失败', 'error');
+                return;
+            }
+            const steps = result.steps || [];
+            if (steps.length > 0 && steps[0].packetView) {
+                if (typeof HistoryModule !== 'undefined' && HistoryModule.renderPacketDetail) {
+                    HistoryModule.renderPacketDetail(steps[0].packetView);
+                }
+                window.currentHex = steps[0].packetHex;
+            }
+        } catch (error) {
+            console.error(error);
+            showToast('实例预览请求失败', 'error');
+        }
+    }
+
+    function filterSidebarInstances(kw) {
+        sidebarInstanceKeyword = kw || '';
+        renderSidebarInstanceList();
+    }
 
     function filterScenes(filter) {
         activeFilter = filter;
@@ -207,6 +350,10 @@ const SceneModule = (function() {
         getCurrentScene,
         getSceneName,
         formatHex,
-        filterScenes
+        filterScenes,
+        switchTab,
+        filterSidebarInstances,
+        selectSidebarInstance,
+        loadSidebarInstances
     };
 })();

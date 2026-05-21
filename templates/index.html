@@ -101,6 +101,12 @@
                     </svg>
                     <span class="sidebar-text">场景编排</span>
                 </a>
+                <a href="#" id="sidebarSignalInstanceLink" class="sidebar-item flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm text-jd-sidebarText" onclick="PanelModule.showPanel('signalInstance')" title="信号实例">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
+                    </svg>
+                    <span class="sidebar-text">信号实例</span>
+                </a>
 
                 <div class="px-3 mt-4 mb-2 sidebar-section-title">
                     <span class="text-[11px] font-medium text-jd-textMuted uppercase tracking-wider px-3">系统</span>
@@ -253,17 +259,20 @@
                             </div>
                         </div>
 
-                        <!-- Right: 信号模板 -->
+                        <!-- Right: 信号模板/实例 -->
                         <div class="w-72 shrink-0 flex flex-col p-4 pl-2">
                             <div class="bg-jd-card rounded-xl border border-jd-cardBorder flex-1 flex flex-col overflow-hidden">
                                 <!-- 头部 -->
                                 <div class="px-4 py-3 border-b border-jd-cardBorder shrink-0">
                                     <div class="flex items-center justify-between mb-2">
-                                        <h3 class="text-sm font-semibold text-jd-text">信号模板</h3>
+                                        <div class="flex items-center scene-tab-group">
+                                            <button class="scene-tab-btn active text-[11px] px-3 py-1 transition-all font-medium" data-tab="template" onclick="SceneModule.switchTab('template')">信号模板</button>
+                                            <button class="scene-tab-btn text-[11px] px-3 py-1 transition-all font-medium" data-tab="instance" onclick="SceneModule.switchTab('instance')">信号实例</button>
+                                        </div>
                                         <span class="text-[10px] px-1.5 py-0.5 rounded bg-jd-primaryLight text-jd-primary font-medium" id="sceneCountBadge">13个模板</span>
                                     </div>
-                                    <!-- 筛选标签 -->
-                                    <div class="flex items-center gap-1">
+                                    <!-- 模板筛选标签 -->
+                                    <div class="flex items-center gap-1 scene-filter-area">
                                         <button class="scene-filter-btn active text-[11px] px-2 py-1 rounded-md transition-all" data-filter="all" onclick="SceneModule.filterScenes('all')">全部</button>
                                         <button class="scene-filter-btn text-[11px] px-2 py-1 rounded-md transition-all" data-filter="facility" onclick="SceneModule.filterScenes('facility')">
                                             <span class="inline-block w-1.5 h-1.5 rounded-full bg-red-400 mr-0.5"></span>设施
@@ -275,10 +284,16 @@
                                             <span class="inline-block w-1.5 h-1.5 rounded-full bg-violet-400 mr-0.5"></span>工具
                                         </button>
                                     </div>
+                                    <!-- 实例搜索区域 -->
+                                    <div class="hidden scene-instance-area">
+                                        <input type="text" class="jd-input w-full px-2.5 py-1.5 rounded-md text-xs bg-white" placeholder="搜索实例..." oninput="SceneModule.filterSidebarInstances(this.value)">
+                                    </div>
                                 </div>
                                 <!-- 信号模板列表 -->
-                                <div class="flex-1 overflow-y-auto scroll-thin p-3" id="sceneList">
-                                    <!-- 模板列表将由JS动态生成 -->
+                                <div class="flex-1 overflow-y-auto scroll-thin p-3 scene-list-area" id="sceneList">
+                                </div>
+                                <!-- 信号实例列表 -->
+                                <div class="flex-1 overflow-y-auto scroll-thin p-3 scene-list-area hidden" id="sceneInstanceList">
                                 </div>
                             </div>
                         </div>
@@ -398,6 +413,40 @@
                     </div>
                 </div>
             </div>
+
+            <div id="signalInstancePanel" class="flex-1 overflow-hidden p-5 hidden">
+                <div class="bg-jd-card rounded-xl border border-jd-cardBorder h-full flex flex-col overflow-hidden shadow-sm">
+                    <div class="h-14 px-5 border-b border-jd-cardBorder flex items-center justify-between shrink-0">
+                        <div class="min-w-0 flex items-center gap-2">
+                            <h2 class="text-base font-semibold text-jd-text">信号实例</h2>
+                            <p class="text-xs text-jd-textMuted">基于模板绑定设备参数，创建长期可复用的调试实例</p>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <button class="btn-primary px-3 py-1.5 rounded-lg text-xs font-medium" onclick="SignalInstanceModule.startCreate()">创建实例</button>
+                        </div>
+                    </div>
+                    <div class="flex-1 min-h-0 grid grid-cols-[280px_minmax(0,1fr)]" id="signalInstanceGridLayout">
+                        <aside class="border-r border-jd-cardBorder bg-jd-content/50 flex flex-col min-h-0 overflow-hidden" style="width:280px;min-width:280px;">
+                            <div class="p-4 border-b border-jd-cardBorder space-y-3 shrink-0">
+                                <div class="flex items-center gap-1.5">
+                                    <h4 class="text-sm font-semibold text-jd-text">实例列表</h4>
+                                </div>
+                                <input type="text" class="jd-input w-full px-3 py-2 rounded-lg text-sm bg-white" placeholder="搜索实例..." oninput="SignalInstanceModule.filterInstances(this.value)">
+                            </div>
+                            <div id="signalInstanceList" class="flex-1 overflow-y-auto scroll-thin p-3 space-y-2">
+                                <div class="text-center text-jd-textMuted text-sm py-8">加载实例中...</div>
+                            </div>
+                        </aside>
+                        <section class="min-w-0 flex flex-col min-h-0 p-5 overflow-y-auto scroll-thin">
+                            <div id="signalInstanceDetail">
+                                <div class="text-center text-jd-textMuted text-sm py-10">
+                                    选择或创建一个信号实例
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 
@@ -480,6 +529,7 @@
     <script src="/static/js/scene.js"></script>
     <script src="/static/js/network.js"></script>
     <script src="/static/js/autoSend.js"></script>
+    <script src="/static/js/signalInstance.js"></script>
     <script src="/static/js/history.js"></script>
     <script src="/static/js/stats.js"></script>
     <script src="/static/js/panel.js"></script>

@@ -315,6 +315,15 @@ const AutoSendModule = (function() {
         }
         container.innerHTML = steps.map((step, index) => renderStepCard(step, index)).join('');
         initFlatpickrInstances();
+        _initStepCustomSelects();
+    }
+
+    function _initStepCustomSelects() {
+        if (typeof CustomSelect === 'undefined') return;
+        document.querySelectorAll('#autoSceneSteps select.jd-input.py-2').forEach(sel => {
+            const inst = CustomSelect.init(sel);
+            if (inst) CustomSelect.refresh(inst);
+        });
     }
 
     function initFlatpickrInstances() {
@@ -651,16 +660,16 @@ const AutoSendModule = (function() {
     }
 
     function openConfigModal() {
-        if (window.PanelModule?.showPanel) {
-            window.PanelModule.showPanel('autoScene');
+        if (typeof PanelModule !== 'undefined' && PanelModule.showPanel) {
+            PanelModule.showPanel('autoScene');
 
         }
         renderAll();
     }
 
     function closeConfigModal() {
-        if (window.PanelModule?.showPanel) {
-            window.PanelModule.showPanel('scene');
+        if (typeof PanelModule !== 'undefined' && PanelModule.showPanel) {
+            PanelModule.showPanel('scene');
         }
     }
 
@@ -1026,6 +1035,9 @@ const AutoSendModule = (function() {
         startAutoSend,
         stopAutoSend,
         toggleAutoSend,
-        isRunning
+        isRunning,
+        getMeta: () => meta,
+        getTemplates: () => templates,
+        getCurrentScene: () => currentScene,
     };
 })();

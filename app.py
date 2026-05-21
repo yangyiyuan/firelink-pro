@@ -31,8 +31,17 @@ try:
         rebuild_step_packet,
         save_template as save_auto_scene_template,
     )
+    from fire_alarm_simulator.services.signal_instance import (
+        create_instance,
+        delete_instance,
+        get_instance,
+        list_instances as list_signal_instances,
+        preview_instance,
+        resolve_instance_packet,
+        touch_instance,
+        update_instance,
+    )
 except ModuleNotFoundError:
-    # 兼容在 fire_alarm_simulator 目录下直接执行 `python app.py`
     from protocol.core import (
         SCENE_CATALOG,
         FireAlarmSimulator,
@@ -46,6 +55,16 @@ except ModuleNotFoundError:
         list_templates as list_auto_send_templates,
         rebuild_step_packet,
         save_template as save_auto_scene_template,
+    )
+    from services.signal_instance import (
+        create_instance,
+        delete_instance,
+        get_instance,
+        list_instances as list_signal_instances,
+        preview_instance,
+        resolve_instance_packet,
+        touch_instance,
+        update_instance,
     )
 
 
@@ -893,6 +912,123 @@ def preview_auto_send_scene():
         return jsonify({'success': False, 'error': str(exc)}), 400
 
 
+@app.route('/api/signal_instances', methods=['GET'])
+def get_signal_instances():
+    return jsonify(list_signal_instances())
+
+
+@app.route('/api/signal_instances', methods=['POST'])
+def create_signal_instance():
+    data = request.get_json() or {}
+    try:
+        instance = create_instance(data)
+        return jsonify(instance), 201
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 500
+
+
+@app.route('/api/signal_instances/<instance_id>', methods=['GET'])
+def get_signal_instance_detail(instance_id: str):
+    instance = get_instance(instance_id)
+    if instance is None:
+        return jsonify({'error': '实例不存在'}), 404
+    return jsonify(instance)
+
+
+@app.route('/api/signal_instances/<instance_id>', methods=['PUT'])
+def update_signal_instance(instance_id: str):
+    data = request.get_json() or {}
+    try:
+        instance = update_instance(instance_id, data)
+        return jsonify(instance)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 500
+
+
+@app.route('/api/signal_instances/<instance_id>', methods=['DELETE'])
+def delete_signal_instance(instance_id: str):
+    if delete_instance(instance_id):
+        return jsonify({'success': True})
+    return jsonify({'error': '实例不存在'}), 404
+
+
+@app.route('/api/signal_instances/<instance_id>/preview', methods=['POST'])
+def preview_signal_instance(instance_id: str):
+    try:
+        result = preview_instance(instance_id)
+        return jsonify(result)
+    except ValueError as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 400
+    except Exception as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 500
+
+
+@app.route('/api/signal_instances/<instance_id>/resolve', methods=['GET'])
+def resolve_signal_instance(instance_id: str):
+    instance = get_instance(instance_id)
+    if instance is None:
+        return jsonify({'error': '实例不存在'}), 404
+    try:
+        packet = resolve_instance_packet(instance)
+        packet_view = build_packet_view(packet, scene=instance.get('templateId', ''), timestamp=now_ms())
+        return jsonify({
+            'instanceId': instance_id,
+            'templateId': instance.get('templateId', ''),
+            'packetHex': packet.hex(),
+            'packetLength': len(packet),
+            'packetView': packet_view,
+        })
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+
+
+@socketio.on('start_signal_instance')
+def handle_start_signal_instance(data: dict[str, Any]) -> None:
+    instance_id = data.get('instanceId', '')
+    network = data.get('network') or {}
+    host = network.get('host', data.get('host', '127.0.0.1'))
+    port = network.get('port', data.get('port', 8080))
+    protocol = network.get('protocol', data.get('protocol', 'tcp'))
+
+    instance = get_instance(instance_id)
+    if instance is None:
+        emit('signal_instance_error', {'message': f'实例 {instance_id} 不存在'})
+        emit('error', {'message': f'实例 {instance_id} 不存在'})
+        return
+
+    try:
+        packet = resolve_instance_packet(instance)
+    except ValueError as exc:
+        emit('signal_instance_error', {'message': str(exc)})
+        emit('error', {'message': str(exc)})
+        return
+
+    touch_instance(instance_id)
+
+    try:
+        result = send_packet_network(packet, host, int(port), protocol, {'scene': instance.get('templateId', '')})
+        packet_view = build_packet_view(packet, scene=instance.get('templateId', ''), timestamp=now_ms())
+        emit('auto_scene_step_result', {
+            **result,
+            'packet_view': packet_view,
+            'step_index': 0,
+            'total_steps': 1,
+            'scene_name': instance.get('name', ''),
+        })
+    except Exception as exc:
+        emit('signal_instance_error', {'message': str(exc)})
+        emit('error', {'message': str(exc)})
+
+
+@socketio.on('stop_signal_instance')
+def handle_stop_signal_instance() -> None:
+    pass
+
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -1032,4 +1168,4 @@ if __name__ == '__main__':
         if debug_mode:
             print('提示: 修改 app.py 或 templates/*.html 后服务将自动重启')
         print('=' * 60)
-    socketio.run(app, host='0.0.0.0', port=5001, debug=debug_mode, use_reloader=debug_mode)
+    socketio.run(app, host='0.0.0.0', port=5001, debug=debug_mode, use_reloader=debug_mode, allow_unsafe_werkzeug=True)
