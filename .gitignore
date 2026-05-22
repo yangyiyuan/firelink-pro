@@ -1,3 +1,7 @@
 network_configs.json
 server.log
 __pycache__/
+
+signal_instances.json
+auto_send_templates.json
+data/
