@@ -76,9 +76,7 @@ body { background: #F1F5F9; }
     white-space: nowrap;
 }
 .jd-select-dropdown {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
+    position: fixed;
     min-width: 100%;
     width: max-content;
     max-width: 320px;
@@ -86,19 +84,16 @@ body { background: #F1F5F9; }
     border: 1px solid #E2E8F0;
     border-radius: 8px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06);
-    z-index: 100;
-    max-height: 240px;
+    z-index: 9999;
     overflow-y: auto;
     overflow-x: hidden;
     padding: 4px;
     opacity: 0;
-    transform: translateY(-4px);
     pointer-events: none;
-    transition: opacity 0.15s ease, transform 0.15s ease;
+    transition: opacity 0.15s ease;
 }
 .jd-select-dropdown.open {
     opacity: 1;
-    transform: translateY(0);
     pointer-events: auto;
 }
 .jd-select-dropdown .jd-option {

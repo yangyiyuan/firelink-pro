@@ -400,6 +400,7 @@ const NetworkModule = (function() {
         toggleConnection,
         connectToTarget,
         disconnectFromTarget,
+        updateConnectionStatus,
         isTargetConnected
     };
 })();

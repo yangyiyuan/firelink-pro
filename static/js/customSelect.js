@@ -25,7 +25,7 @@ const CustomSelect = (function() {
         selectEl.parentNode.insertBefore(wrapper, selectEl);
         wrapper.appendChild(selectEl);
         wrapper.appendChild(trigger);
-        wrapper.appendChild(dropdown);
+        document.body.appendChild(dropdown);
 
         const inst = { selectEl, wrapper, trigger, dropdown, textSpan, isOpen: false };
         instances.set(selectEl, inst);
@@ -55,7 +55,7 @@ const CustomSelect = (function() {
 
         // 点击外部关闭
         document.addEventListener('click', (e) => {
-            if (!wrapper.contains(e.target)) close(inst);
+            if (!wrapper.contains(e.target) && !dropdown.contains(e.target)) close(inst);
         });
 
         // 下拉面板内阻止滚轮冒泡，防止被父容器 overflow:hidden 吞掉
@@ -63,11 +63,16 @@ const CustomSelect = (function() {
             e.stopPropagation();
         }, { passive: true });
 
-        // 页面滚动时关闭（但下拉面板内部滚动不关闭）
+        // 页面滚动时重新定位
         window.addEventListener('scroll', (e) => {
             if (dropdown.contains(e.target)) return;
-            close(inst);
+            if (inst.isOpen) positionDropdown(inst);
         }, true);
+
+        // 窗口大小变化时重新定位
+        window.addEventListener('resize', () => {
+            if (inst.isOpen) positionDropdown(inst);
+        });
 
         return inst;
     }
@@ -115,22 +120,60 @@ const CustomSelect = (function() {
     }
 
     function open(inst) {
-        // 先关闭其他所有
         instances.forEach(other => { if (other !== inst) close(other); });
         inst.trigger.classList.add('open');
         inst.dropdown.classList.add('open');
         inst.isOpen = true;
 
-        // 滚动到 active 项
+        positionDropdown(inst);
+
         const active = inst.dropdown.querySelector('.jd-option.active');
         if (active) {
             active.scrollIntoView({ block: 'nearest' });
         }
     }
 
+    function positionDropdown(inst) {
+        const { trigger, dropdown } = inst;
+
+        const triggerRect = trigger.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        const viewportWidth = window.innerWidth;
+        const spaceBelow = viewportHeight - triggerRect.bottom;
+        const spaceAbove = triggerRect.top;
+        const gap = 4;
+        const padding = 8;
+
+        dropdown.style.left = triggerRect.left + 'px';
+        dropdown.style.minWidth = triggerRect.width + 'px';
+
+        const dropdownHeight = dropdown.scrollHeight;
+
+        const maxDropDown = Math.min(dropdownHeight, spaceBelow - gap - padding);
+        const maxDropUp = Math.min(dropdownHeight, spaceAbove - gap - padding);
+
+        if (maxDropDown >= dropdownHeight || maxDropDown >= maxDropUp) {
+            dropdown.style.top = (triggerRect.bottom + gap) + 'px';
+            dropdown.style.maxHeight = Math.max(maxDropDown, 80) + 'px';
+        } else {
+            dropdown.style.top = '';
+            dropdown.style.bottom = (viewportHeight - triggerRect.top + gap) + 'px';
+            dropdown.style.maxHeight = Math.max(maxDropUp, 80) + 'px';
+        }
+
+        if (triggerRect.left + dropdown.offsetWidth > viewportWidth) {
+            dropdown.style.left = Math.max(8, viewportWidth - dropdown.offsetWidth - 8) + 'px';
+        }
+    }
+
     function close(inst) {
         inst.trigger.classList.remove('open');
         inst.dropdown.classList.remove('open');
+        inst.dropdown.style.top = '';
+        inst.dropdown.style.bottom = '';
+        inst.dropdown.style.left = '';
+        inst.dropdown.style.minWidth = '';
+        inst.dropdown.style.maxHeight = '';
         inst.isOpen = false;
     }
 
