@@ -961,6 +961,7 @@ def resolve_signal_instance(instance_id: str):
 
 @socketio.on('start_signal_instance')
 def handle_start_signal_instance(data: dict[str, Any]) -> None:
+    global target_connection
     instance_id = data.get('instanceId', '')
     network = data.get('network') or {}
     host = network.get('host', data.get('host', '127.0.0.1'))
@@ -983,7 +984,31 @@ def handle_start_signal_instance(data: dict[str, Any]) -> None:
     touch_instance(instance_id)
 
     try:
-        result = send_packet_network(packet, host, int(port), protocol, {'scene': instance.get('templateId', '')})
+        with target_lock:
+            conn = target_connection
+
+        if conn is not None:
+            if conn['protocol'] == 'tcp' and conn['socket']:
+                conn['socket'].sendall(packet)
+            else:
+                udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                udp_sock.sendto(packet, (conn['host'], conn['port']))
+                udp_sock.close()
+            simulator.stats['total_sent'] += 1
+            result = {
+                'success': True,
+                'length': len(packet),
+                'hex': packet.hex(),
+                'host': conn['host'],
+                'port': conn['port'],
+                'protocol': conn['protocol'],
+                'timestamp': now_ms(),
+                'scene': instance.get('templateId', ''),
+            }
+            record_send_history(result)
+        else:
+            result = send_packet_network(packet, host, int(port), protocol, {'scene': instance.get('templateId', '')})
+
         packet_view = build_packet_view(packet, scene=instance.get('templateId', ''), timestamp=now_ms())
         emit('auto_scene_step_result', {
             **result,
@@ -993,6 +1018,10 @@ def handle_start_signal_instance(data: dict[str, Any]) -> None:
             'scene_name': instance.get('name', ''),
         })
     except Exception as exc:
+        with target_lock:
+            if target_connection is not None:
+                _close_target_connection()
+                target_connection = None
         emit('signal_instance_error', {'message': str(exc)})
         emit('error', {'message': str(exc)})
 

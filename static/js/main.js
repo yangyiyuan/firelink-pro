@@ -70,11 +70,18 @@ function sendPacket() {
     const cfg = NetworkModule.getNetworkConfig();
     document.getElementById('targetServer').textContent = `${cfg.host}:${cfg.port}`;
 
+    const instanceId = SceneModule.getSelectedInstanceId();
+    if (instanceId) {
+        globalSocket.emit('start_signal_instance', {
+            instanceId: instanceId,
+            network: cfg,
+        });
+        return;
+    }
+
     if (NetworkModule.isTargetConnected()) {
-        // 通过持久连接发送
         globalSocket.emit('send_via_connection', { scene: SceneModule.getCurrentScene() });
     } else {
-        // 一次性发送
         globalSocket.emit('send_packet', { scene: SceneModule.getCurrentScene(), ...cfg });
     }
 }

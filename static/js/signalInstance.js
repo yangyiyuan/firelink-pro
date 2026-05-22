@@ -186,7 +186,7 @@ const SignalInstanceModule = (function() {
                 </div>
                 <div class="flex items-center gap-2 pt-2">
                     <button class="btn-primary px-4 py-2 rounded-lg text-xs font-medium" onclick="SignalInstanceModule.previewInstance()" ${tplMissing ? 'disabled' : ''}>预览报文</button>
-                    <button class="btn-success px-4 py-2 rounded-lg text-xs font-medium" onclick="SignalInstanceModule.startSend()" ${tplMissing ? 'disabled' : ''}>发送</button>
+                    <a href="#scene" class="btn-success px-4 py-2 rounded-lg text-xs font-medium inline-flex items-center justify-center" onclick="SignalInstanceModule.goToScene(); PanelModule.showPanel('scene'); return false;" ${tplMissing ? 'disabled' : ''}>发送</a>
                 </div>
                 <div id="instancePreviewArea"></div>
             </div>
@@ -638,6 +638,13 @@ const SignalInstanceModule = (function() {
         });
     }
 
+    function goToScene() {
+        if (!selectedInstance) return;
+        if (typeof SceneModule !== 'undefined') {
+            SceneModule.selectSidebarInstance(selectedInstance.id);
+        }
+    }
+
     function setupSocketListeners() {
         socket.on('signal_instance_error', (data) => {
             showToast(data.message || '实例执行失败', 'error');
@@ -668,6 +675,7 @@ const SignalInstanceModule = (function() {
         confirmDelete,
         previewInstance,
         startSend,
+        goToScene,
         filterInstances,
         getSelectedInstance,
         reloadInstances,

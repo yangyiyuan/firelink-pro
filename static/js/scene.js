@@ -140,13 +140,13 @@ const SceneModule = (function() {
 
     function selectScene(sceneId) {
         currentScene = sceneId;
+        selectedSidebarInstanceId = null;
         const tmpl = templates.find(s => s.id === sceneId);
         document.getElementById('breadcrumbScene').textContent = tmpl.name;
         const label = document.getElementById('currentSceneName');
         label.textContent = tmpl.name;
         label.className = 'text-xs px-2 py-0.5 rounded-full bg-jd-primaryLight text-jd-primary';
 
-        // 更新侧边栏模板列表选中状态
         updateSceneSidebarSelection(sceneId);
 
         socket.emit('generate_packet', {scene: sceneId});
@@ -277,21 +277,36 @@ const SceneModule = (function() {
         }).join('');
     }
 
-    function selectSidebarInstance(instanceId) {
+    async function selectSidebarInstance(instanceId) {
+        if (activeTab !== 'instance') {
+            switchTab('instance');
+        }
+
         const inst = sidebarInstances.find(i => i.id === instanceId);
-        if (!inst) return;
+        if (!inst) {
+            await loadSidebarInstances();
+        }
+
+        const found = sidebarInstances.find(i => i.id === instanceId);
+        if (!found) return;
+
         selectedSidebarInstanceId = instanceId;
         renderSidebarInstanceList();
 
-        document.getElementById('breadcrumbScene').textContent = inst.name || '未命名实例';
+        const activeCard = document.querySelector('#sceneInstanceList .scene-card-active');
+        if (activeCard) {
+            activeCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        document.getElementById('breadcrumbScene').textContent = found.name || '未命名实例';
         const label = document.getElementById('currentSceneName');
         if (label) {
-            label.textContent = inst.name || '未命名实例';
+            label.textContent = found.name || '未命名实例';
             label.className = 'text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600';
         }
 
         previewSidebarInstance(instanceId);
-        showToast(`已选择实例: ${inst.name || '未命名实例'}`, 'info');
+        showToast(`已选择实例: ${found.name || '未命名实例'}`, 'info');
     }
 
     async function previewSidebarInstance(instanceId) {
@@ -338,10 +353,20 @@ const SceneModule = (function() {
         return templates.find(s => s.id === sceneId)?.name || sceneId;
     }
 
+    function getSelectedInstanceId() {
+        return selectedSidebarInstanceId;
+    }
+
+    function clearSelectedInstance() {
+        selectedSidebarInstanceId = null;
+    }
+
     return {
         init,
         selectScene,
         getCurrentScene,
+        getSelectedInstanceId,
+        clearSelectedInstance,
         getSceneName,
         formatHex,
         filterScenes,
