@@ -121,13 +121,28 @@ const AutoSendModule = (function() {
         return `${prefix}_${Math.random().toString(16).slice(2, 10)}`;
     }
 
+    function migrateStep(step) {
+        if (!step.object && step.objects) {
+            step.object = Array.isArray(step.objects) && step.objects.length > 0
+                ? step.objects[0]
+                : createObject();
+            delete step.objects;
+        } else if (!step.object) {
+            step.object = createObject();
+        }
+        return step;
+    }
+
     function cloneScene(scene) {
         const value = JSON.parse(JSON.stringify(scene || createFallbackScene()));
-        value.steps = (value.steps || []).map(step => ({
-            ...step,
-            id: step.id || generateId('step'),
-            object: step.object ? { ...step.object, id: step.object.id || generateId('obj') } : createObject()
-        }));
+        value.steps = (value.steps || []).map(step => {
+            migrateStep(step);
+            return {
+                ...step,
+                id: step.id || generateId('step'),
+                object: { ...step.object, id: step.object.id || generateId('obj') }
+            };
+        });
         return value;
     }
 
@@ -138,7 +153,7 @@ const AutoSendModule = (function() {
                 ? { systemType: 1, systemAddr: 1, componentType: 31, bitNo: 1, zoneNo: 1, analogType: 3, analogValue: 850, occurredAtMode: 'now', occurredAt: '' }
                 : objectType === 'device_status'
                     ? { statusByte: 0, occurredAtMode: 'now', occurredAt: '' }
-                    : { systemType: 1, systemAddr: 1, componentType: 42, bitNo: 1, zoneNo: 1, componentStatus: 1, description: '', occurredAtMode: 'now', occurredAt: '' };
+                    : { systemType: 1, systemAddr: 1, componentType: 42, bitNo: 1, zoneNo: 1, componentStatus: 2, description: '', occurredAtMode: 'now', occurredAt: '' };
         return {
             id: generateId('obj'),
             objectType,
@@ -366,11 +381,11 @@ const AutoSendModule = (function() {
         )).join('');
         const typeFlagBadge = escapeHtml(getTypeFlagLabel(step.packetHeader.typeFlag));
         const commandBadge = escapeHtml(getCommandLabel(step.packetHeader.command));
-        // 自动推导时：命令字和类型标志用只读badge展示；否则显示下拉框；系统模板时全部只读badge
-        const commandField = (autoDerived || locked)
+        // 系统模板时全部只读badge；否则显示下拉框可编辑
+        const commandField = locked
             ? `<div><label class="block text-xs text-jd-textSecondary mb-1.5">命令字</label><div class="jd-input w-full px-3 py-2 rounded-lg text-sm bg-jd-content text-jd-text">${commandBadge}</div></div>`
             : `<div><label class="block text-xs text-jd-textSecondary mb-1.5">命令字</label><select class="jd-input w-full px-3 py-2 rounded-lg text-sm bg-white" onchange="AutoSendModule.updateStepField(${stepIndex}, 'command', this.value)">${commandOptions}</select></div>`;
-        const typeFlagField = (autoDerived || locked)
+        const typeFlagField = locked
             ? `<div><label class="block text-xs text-jd-textSecondary mb-1.5">类型标志</label><div class="jd-input w-full px-3 py-2 rounded-lg text-sm bg-jd-content text-jd-text">${typeFlagBadge}</div></div>`
             : `<div><label class="block text-xs text-jd-textSecondary mb-1.5">类型标志</label><select class="jd-input w-full px-3 py-2 rounded-lg text-sm bg-white" onchange="AutoSendModule.updateStepField(${stepIndex}, 'typeFlag', this.value)">${typeFlagOptions}</select></div>`;
         return `
@@ -406,10 +421,10 @@ const AutoSendModule = (function() {
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
-                        <div>${(autoDerived || locked)
+                        <div>${locked
             ? `<label class="block text-xs text-jd-textSecondary mb-1.5">命令字</label><div class="jd-input w-full px-3 py-2 rounded-lg text-sm bg-jd-content text-jd-text">${commandBadge}</div>`
             : `<label class="block text-xs text-jd-textSecondary mb-1.5">命令字</label><select class="jd-input w-full px-3 py-2 rounded-lg text-sm bg-white" onchange="AutoSendModule.updateStepField(${stepIndex}, 'command', this.value)">${commandOptions}</select>`}</div>
-                        <div>${(autoDerived || locked)
+                        <div>${locked
             ? `<label class="block text-xs text-jd-textSecondary mb-1.5">类型标志</label><div class="jd-input w-full px-3 py-2 rounded-lg text-sm bg-jd-content text-jd-text">${typeFlagBadge}</div>`
             : `<label class="block text-xs text-jd-textSecondary mb-1.5">类型标志</label><select class="jd-input w-full px-3 py-2 rounded-lg text-sm bg-white" onchange="AutoSendModule.updateStepField(${stepIndex}, 'typeFlag', this.value)">${typeFlagOptions}</select>`}</div>
                     </div>
@@ -595,7 +610,20 @@ const AutoSendModule = (function() {
 
         status.className = 'text-[11px] px-2 py-1 rounded-full bg-emerald-50 text-emerald-700';
         status.textContent = `已预览 ${previewSteps.length} 步`;
-        panel.innerHTML = previewSteps.map((step, index) => `
+        panel.innerHTML = previewSteps.map((step, index) => {
+            const aduObjects = step.packetView?.adu_parsed?.objects || [];
+            const objectSummaries = aduObjects.map(o => o.summary).filter(Boolean);
+            const objectFields = aduObjects.flatMap(o => (o.fields || []));
+            const compTypeField = objectFields.find(f => f.label === '部件类型');
+            const compAddrField = objectFields.find(f => f.label === '部件地址');
+            const descField = objectFields.find(f => f.label === '部件说明');
+            const sysTypeField = objectFields.find(f => f.label === '系统类型');
+            const sysStatusField = objectFields.find(f => f.label === '系统状态');
+            const analogTypeField = objectFields.find(f => f.label === '模拟量类型');
+            const analogValueField = objectFields.find(f => f.label === '模拟量值');
+            const statusByteField = objectFields.find(f => f.label === '装置状态');
+            const activeFlags = aduObjects.flatMap(o => (o.status_flags || []).filter(f => f.active).map(f => f.on)).slice(0, 3);
+            return `
             <section class="rounded-xl border border-jd-cardBorder bg-white p-4 space-y-3">
                 <div class="flex items-start justify-between gap-3 flex-wrap">
                     <div>
@@ -619,21 +647,40 @@ const AutoSendModule = (function() {
                         <div class="text-[11px] text-jd-textMuted">包长度</div>
                         <div class="text-xs font-mono font-semibold text-jd-text mt-1">${step.packetLength}B</div>
                     </div>
-                    <div class="${step.packetView?.adu_parsed ? 'bg-jd-primaryLight border border-jd-primaryBorder cursor-pointer hover:bg-blue-100 transition-colors' : 'bg-jd-content'} rounded-lg px-3 py-2" ${step.packetView?.adu_parsed ? `onclick="HistoryModule.openAduModal()" title="点击查看应用数据单元详情"` : ''}>
+                    <div class="${step.packetView?.adu_parsed ? 'bg-jd-primaryLight border border-jd-primaryBorder cursor-pointer hover:bg-blue-100 transition-colors' : 'bg-jd-content'} rounded-lg px-3 py-2" ${step.packetView?.adu_parsed ? `onclick="AutoSendModule.applyPreview(${index}); HistoryModule.openAduModal()" title="点击查看应用数据单元详情"` : ''}>
                         <div class="text-[11px] ${step.packetView?.adu_parsed ? 'text-jd-primary' : 'text-jd-textMuted'} mb-0.5">信息对象数${step.packetView?.adu_parsed ? ' ↗' : ''}</div>
                         <div class="flex items-center gap-1.5">
                             <span class="text-xs font-mono font-semibold ${step.packetView?.adu_parsed ? 'text-jd-primary' : 'text-jd-text'}">${step.objectCount}</span>
                             ${step.packetView?.adu_parsed ? '<span class="text-[10px] px-1.5 py-0.5 rounded-full bg-jd-primary/10 text-jd-primary font-medium">查看ADU</span>' : ''}
                         </div>
-                        ${(() => { const _l = (step.packetView?.adu_parsed?.objects || []).flatMap(o => (o.status_flags || []).filter(f => f.active).map(f => f.on)).slice(0, 3); return _l.length ? `<div class="text-[10px] text-amber-600 mt-1 truncate">${_l.map(s => escapeHtml(s)).join(' / ')}</div>` : ''; })()}
+                        ${activeFlags.length ? `<div class="text-[10px] text-amber-600 mt-1 truncate">${activeFlags.map(s => escapeHtml(s)).join(' / ')}</div>` : ''}
                     </div>
                 </div>
+                ${objectSummaries.length ? `
+                <div class="rounded-lg border border-jd-cardBorder bg-jd-content/40 px-3 py-2 space-y-1.5">
+                    ${aduObjects.map((o, oi) => `
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-white text-jd-textMuted border border-jd-cardBorder">对象${oi + 1}</span>
+                        <span class="text-xs font-medium text-jd-text">${escapeHtml(o.summary || '')}</span>
+                    </div>
+                    ${compTypeField ? `<div class="text-[11px] text-jd-textMuted ml-6">部件类型: <span class="text-jd-text font-medium">${escapeHtml(compTypeField.value || '')}</span></div>` : ''}
+                    ${compAddrField ? `<div class="text-[11px] text-jd-textMuted ml-6">部件地址: <span class="text-jd-text font-mono font-medium">${escapeHtml(compAddrField.value || '')}</span></div>` : ''}
+                    ${descField ? `<div class="text-[11px] text-jd-textMuted ml-6">描述: <span class="text-jd-text">${escapeHtml(descField.value || '')}</span></div>` : ''}
+                    ${sysTypeField ? `<div class="text-[11px] text-jd-textMuted ml-6">系统类型: <span class="text-jd-text font-medium">${escapeHtml(sysTypeField.value || '')}</span></div>` : ''}
+                    ${sysStatusField ? `<div class="text-[11px] text-jd-textMuted ml-6">系统状态: <span class="text-jd-text font-medium">${escapeHtml(sysStatusField.value || '')}</span></div>` : ''}
+                    ${analogTypeField ? `<div class="text-[11px] text-jd-textMuted ml-6">模拟量类型: <span class="text-jd-text font-medium">${escapeHtml(analogTypeField.value || '')}</span></div>` : ''}
+                    ${analogValueField ? `<div class="text-[11px] text-jd-textMuted ml-6">模拟量值: <span class="text-jd-text font-mono font-medium">${escapeHtml(analogValueField.value || '')}</span></div>` : ''}
+                    ${statusByteField ? `<div class="text-[11px] text-jd-textMuted ml-6">装置状态: <span class="text-jd-text font-medium">${escapeHtml(statusByteField.value || '')}</span></div>` : ''}
+                    `).join('')}
+                </div>
+                ` : ''}
                 <div>
                     <div class="text-[11px] text-jd-textMuted mb-1.5">HEX 预览</div>
                     <div class="raw-hex-box hex-display">${SceneModule.formatHex(step.packetHex)}</div>
                 </div>
             </section>
-        `).join('');
+        `;
+        }).join('');
     }
 
     function openConfigModal() {

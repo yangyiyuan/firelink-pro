@@ -415,13 +415,35 @@ def _default_scene() -> Dict[str, Any]:
     }
 
 
+def _migrate_step(step: Dict[str, Any]) -> Dict[str, Any]:
+    if 'object' not in step and 'objects' in step:
+        objects = step['objects']
+        if isinstance(objects, list) and len(objects) > 0:
+            step['object'] = objects[0]
+        else:
+            step['object'] = _create_object('component_status')
+        del step['objects']
+    elif 'object' not in step:
+        step['object'] = _create_object('component_status')
+    return step
+
+
+def _migrate_template(template: Dict[str, Any]) -> Dict[str, Any]:
+    steps = template.get('steps') or []
+    template['steps'] = [_migrate_step(s) for s in steps]
+    if 'version' not in template:
+        template['version'] = 2
+    return template
+
+
 def _load_user_templates() -> List[Dict[str, Any]]:
     if not os.path.exists(TEMPLATE_FILE):
         return []
     try:
         with open(TEMPLATE_FILE, 'r', encoding='utf-8') as fh:
             data = json.load(fh)
-        return data.get('templates', [])
+        templates = data.get('templates', [])
+        return [_migrate_template(t) for t in templates]
     except Exception:
         return []
 
