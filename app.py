@@ -869,7 +869,7 @@ def preview_auto_send_scene():
                 'packetHex': step['packet_hex'],
                 'packetLength': len(step['packet']),
                 'packetView': step['packet_view'],
-                'objectCount': len(step['objects']),
+                'objectCount': 1,
             }
             for step in plan['steps']
         ]

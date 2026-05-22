@@ -111,9 +111,9 @@ const AutoSendModule = (function() {
             category: 'custom',
             description: '',
             source: 'draft',
-            version: 1,
+            version: 2,
             loop: true,
-            steps: [createStep()]
+            steps: [createStep(), createStep()]
         };
     }
 
@@ -126,10 +126,7 @@ const AutoSendModule = (function() {
         value.steps = (value.steps || []).map(step => ({
             ...step,
             id: step.id || generateId('step'),
-            objects: (step.objects || []).map(obj => ({
-                ...obj,
-                id: obj.id || generateId('obj')
-            }))
+            object: step.object ? { ...step.object, id: step.object.id || generateId('obj') } : createObject()
         }));
         return value;
     }
@@ -150,7 +147,6 @@ const AutoSendModule = (function() {
     }
 
     function createStep(typeFlag = null) {
-        // 如果当前分类有默认推导值，使用推导的 typeFlag
         const defaults = categoryDefaults[currentScene?.category];
         const effectiveTypeFlag = typeFlag ?? (defaults?.typeFlag ?? 2);
         const effectiveCommand = defaults?.command ?? 2;
@@ -165,7 +161,7 @@ const AutoSendModule = (function() {
                 command: effectiveCommand,
                 typeFlag: effectiveTypeFlag
             },
-            objects: [createObject(primaryObjectType)]
+            object: createObject(primaryObjectType)
         };
     }
 
@@ -259,8 +255,10 @@ const AutoSendModule = (function() {
         const locked = isSystemTemplate();
         const btnSave = document.getElementById('btnSaveTemplate');
         const btnAddStep = document.getElementById('btnAddStep');
+        const btnDelete = document.getElementById('btnDeleteTemplate');
         if (btnSave) btnSave.disabled = locked;
         if (btnAddStep) btnAddStep.disabled = locked;
+        if (btnDelete) btnDelete.disabled = !currentScene || currentScene.source !== 'user';
     }
 
 
@@ -329,10 +327,8 @@ const AutoSendModule = (function() {
     function initFlatpickrInstances() {
         document.querySelectorAll('.fp-datetime').forEach(el => {
             const stepIndex = parseInt(el.id.split('-')[1]);
-            const objectIndex = parseInt(el.id.split('-')[2]);
             const isDisabled = el.hasAttribute('disabled');
             const savedValue = el.dataset.value;
-            // 销毁旧实例
             if (el._flatpickr) el._flatpickr.destroy();
             if (typeof flatpickr === 'undefined') return;
             el._flatpickr = flatpickr(el, {
@@ -345,7 +341,7 @@ const AutoSendModule = (function() {
                 disabled: isDisabled,
                 onChange: function(selectedDates, dateStr) {
                     if (!isDisabled) {
-                        AutoSendModule.updateObjectField(stepIndex, objectIndex, 'occurredAt', dateStr);
+                        AutoSendModule.updateObjectField(stepIndex, 'occurredAt', dateStr);
                     }
                 },
             });
@@ -417,38 +413,19 @@ const AutoSendModule = (function() {
             ? `<label class="block text-xs text-jd-textSecondary mb-1.5">类型标志</label><div class="jd-input w-full px-3 py-2 rounded-lg text-sm bg-jd-content text-jd-text">${typeFlagBadge}</div>`
             : `<label class="block text-xs text-jd-textSecondary mb-1.5">类型标志</label><select class="jd-input w-full px-3 py-2 rounded-lg text-sm bg-white" onchange="AutoSendModule.updateStepField(${stepIndex}, 'typeFlag', this.value)">${typeFlagOptions}</select>`}</div>
                     </div>
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h5 class="text-sm font-semibold text-jd-text">信息对象</h5>
-                            <p class="text-xs text-jd-textMuted mt-1">当前类型标志支持 ${getAllowedObjectTypes(step.packetHeader.typeFlag).map(getObjectTypeLabel).join(' / ')}</p>
-                        </div>
-                        <button class="btn-primary px-3 py-1.5 rounded-lg text-xs font-medium" onclick="AutoSendModule.addObject(${stepIndex})"${dis}>新增对象</button>
+                    <div>
+                        <h5 class="text-sm font-semibold text-jd-text">信息对象</h5>
+                        <p class="text-xs text-jd-textMuted mt-1">当前类型标志支持 ${getAllowedObjectTypes(step.packetHeader.typeFlag).map(getObjectTypeLabel).join(' / ')}</p>
                     </div>
-                    <div class="space-y-3">
-                        ${(step.objects || []).map((obj, objectIndex) => renderObjectCard(step, stepIndex, obj, objectIndex)).join('')}
+                    <div class="rounded-xl border border-jd-cardBorder bg-jd-content/50 p-4 space-y-3">
+                        ${renderObjectFields(step.object || {}, stepIndex)}
                     </div>
                 </div>
             </section>
         `;
     }
 
-    function renderObjectCard(step, stepIndex, obj, objectIndex) {
-        const locked = isSystemTemplate();
-        return `
-            <div class="rounded-xl border border-jd-cardBorder bg-jd-content/50 p-4 space-y-3">
-                <div class="flex items-center justify-between gap-3 flex-wrap">
-                    <div class="flex items-center gap-2">
-                        <span class="text-[11px] px-2 py-0.5 rounded-full bg-white border border-jd-cardBorder text-jd-textMuted">对象 ${objectIndex + 1}</span>
-                        <span class="text-sm font-medium text-jd-text">${escapeHtml(getObjectTypeLabel(obj.objectType))}</span>
-                    </div>
-                    ${locked ? '' : `<button class="btn-secondary px-2.5 py-1 rounded-md text-xs" onclick="AutoSendModule.removeObject(${stepIndex}, ${objectIndex})">删除</button>`}
-                </div>
-                ${renderObjectFields(obj, stepIndex, objectIndex)}
-            </div>
-        `;
-    }
-
-    function renderObjectFields(obj, stepIndex, objectIndex) {
+    function renderObjectFields(obj, stepIndex) {
         const locked = isSystemTemplate();
         const dis = locked ? ' disabled' : '';
         const disBg = locked ? 'bg-jd-content text-jd-text cursor-default' : 'bg-white';
@@ -456,23 +433,23 @@ const AutoSendModule = (function() {
         const commonTimeFields = `
             <div>
                 <label class="block text-xs text-jd-textSecondary mb-1.5">时间模式</label>
-                <select class="jd-input w-full px-3 py-2 rounded-lg text-sm ${disBg}" onchange="AutoSendModule.updateObjectField(${stepIndex}, ${objectIndex}, 'occurredAtMode', this.value)"${dis}>
+                <select class="jd-input w-full px-3 py-2 rounded-lg text-sm ${disBg}" onchange="AutoSendModule.updateObjectField(${stepIndex}, 'occurredAtMode', this.value)"${dis}>
                     <option value="now" ${fields.occurredAtMode !== 'fixed' ? 'selected' : ''}>执行时取当前时间</option>
                     <option value="fixed" ${fields.occurredAtMode === 'fixed' ? 'selected' : ''}>固定时间</option>
                 </select>
             </div>
             <div>
                 <label class="block text-xs text-jd-textSecondary mb-1.5">固定时间</label>
-                <input type="text" id="fp-${stepIndex}-${objectIndex}" class="jd-input fp-datetime w-full px-3 py-2 rounded-lg text-sm ${disBg}" placeholder="点击选择日期时间" data-value="${escapeHtml(fields.occurredAt || '')}" ${fields.occurredAtMode === 'fixed' ? '' : 'disabled'}${dis}>
+                <input type="text" id="fp-${stepIndex}" class="jd-input fp-datetime w-full px-3 py-2 rounded-lg text-sm ${disBg}" placeholder="点击选择日期时间" data-value="${escapeHtml(fields.occurredAt || '')}" ${fields.occurredAtMode === 'fixed' ? '' : 'disabled'}${dis}>
             </div>
         `;
 
         if (obj.objectType === 'system_status') {
             return `
                 <div class="grid grid-cols-2 xl:grid-cols-3 gap-3">
-                    ${renderSystemTypeSelect(fields.systemType, stepIndex, objectIndex)}
-                    ${renderNumberInput('系统地址', fields.systemAddr, stepIndex, objectIndex, 'systemAddr')}
-                    ${renderPresetSelect('系统状态', 'system_status', fields.systemStatus, stepIndex, objectIndex, 'systemStatus')}
+                    ${renderSystemTypeSelect(fields.systemType, stepIndex)}
+                    ${renderNumberInput('系统地址', fields.systemAddr, stepIndex, 'systemAddr')}
+                    ${renderPresetSelect('系统状态', 'system_status', fields.systemStatus, stepIndex, 'systemStatus')}
                     ${commonTimeFields}
                 </div>
             `;
@@ -481,13 +458,13 @@ const AutoSendModule = (function() {
         if (obj.objectType === 'analog_value') {
             return `
                 <div class="grid grid-cols-2 xl:grid-cols-3 gap-3">
-                    ${renderSystemTypeSelect(fields.systemType, stepIndex, objectIndex)}
-                    ${renderNumberInput('系统地址', fields.systemAddr, stepIndex, objectIndex, 'systemAddr')}
-                    ${renderComponentTypeSelect(fields.componentType, stepIndex, objectIndex, fields.systemType)}
-                    ${renderNumberInput('位号', fields.bitNo, stepIndex, objectIndex, 'bitNo')}
-                    ${renderNumberInput('区号', fields.zoneNo, stepIndex, objectIndex, 'zoneNo')}
-                    ${renderAnalogTypeSelect(fields.analogType, stepIndex, objectIndex)}
-                    ${renderNumberInput('模拟量值', fields.analogValue, stepIndex, objectIndex, 'analogValue')}
+                    ${renderSystemTypeSelect(fields.systemType, stepIndex)}
+                    ${renderNumberInput('系统地址', fields.systemAddr, stepIndex, 'systemAddr')}
+                    ${renderComponentTypeSelect(fields.componentType, stepIndex, fields.systemType)}
+                    ${renderNumberInput('位号', fields.bitNo, stepIndex, 'bitNo')}
+                    ${renderNumberInput('区号', fields.zoneNo, stepIndex, 'zoneNo')}
+                    ${renderAnalogTypeSelect(fields.analogType, stepIndex)}
+                    ${renderNumberInput('模拟量值', fields.analogValue, stepIndex, 'analogValue')}
                     ${commonTimeFields}
                 </div>
             `;
@@ -496,7 +473,7 @@ const AutoSendModule = (function() {
         if (obj.objectType === 'device_status') {
             return `
                 <div class="grid grid-cols-2 xl:grid-cols-3 gap-3">
-                    ${renderPresetSelect('装置状态', 'device_status', fields.statusByte, stepIndex, objectIndex, 'statusByte')}
+                    ${renderPresetSelect('装置状态', 'device_status', fields.statusByte, stepIndex, 'statusByte')}
                     ${commonTimeFields}
                 </div>
             `;
@@ -504,15 +481,15 @@ const AutoSendModule = (function() {
 
         return `
             <div class="grid grid-cols-2 xl:grid-cols-3 gap-3">
-                ${renderSystemTypeSelect(fields.systemType, stepIndex, objectIndex)}
-                ${renderNumberInput('系统地址', fields.systemAddr, stepIndex, objectIndex, 'systemAddr')}
-                ${renderComponentTypeSelect(fields.componentType, stepIndex, objectIndex, fields.systemType)}
-                ${renderNumberInput('位号', fields.bitNo, stepIndex, objectIndex, 'bitNo')}
-                ${renderNumberInput('区号', fields.zoneNo, stepIndex, objectIndex, 'zoneNo')}
-                ${renderPresetSelect('部件状态', 'component_status', fields.componentStatus, stepIndex, objectIndex, 'componentStatus')}
+                ${renderSystemTypeSelect(fields.systemType, stepIndex)}
+                ${renderNumberInput('系统地址', fields.systemAddr, stepIndex, 'systemAddr')}
+                ${renderComponentTypeSelect(fields.componentType, stepIndex, fields.systemType)}
+                ${renderNumberInput('位号', fields.bitNo, stepIndex, 'bitNo')}
+                ${renderNumberInput('区号', fields.zoneNo, stepIndex, 'zoneNo')}
+                ${renderPresetSelect('部件状态', 'component_status', fields.componentStatus, stepIndex, 'componentStatus')}
                 <div>
                     <label class="block text-xs text-jd-textSecondary mb-1.5">描述</label>
-                    <input type="text" class="jd-input w-full px-3 py-2 rounded-lg text-sm ${disBg}" value="${escapeHtml(fields.description || '')}"${dis} oninput="AutoSendModule.updateObjectField(${stepIndex}, ${objectIndex}, 'description', this.value)">
+                    <input type="text" class="jd-input w-full px-3 py-2 rounded-lg text-sm ${disBg}" value="${escapeHtml(fields.description || '')}"${dis} oninput="AutoSendModule.updateObjectField(${stepIndex}, 'description', this.value)">
                 </div>
                 ${commonTimeFields}
             </div>
@@ -529,21 +506,21 @@ const AutoSendModule = (function() {
         return allTypes.filter(item => allowedSet.has(Number(item.value)));
     }
 
-    function renderSystemTypeSelect(value, stepIndex, objectIndex) {
+    function renderSystemTypeSelect(value, stepIndex) {
         const locked = isSystemTemplate();
         const dis = locked ? ' disabled' : '';
         const disBg = locked ? 'bg-jd-content text-jd-text cursor-default' : 'bg-white';
         return `
             <div>
                 <label class="block text-xs text-jd-textSecondary mb-1.5">系统类型</label>
-                <select class="jd-input w-full px-3 py-2 rounded-lg text-sm ${disBg}" onchange="AutoSendModule.updateObjectField(${stepIndex}, ${objectIndex}, 'systemType', this.value)"${dis}>
+                <select class="jd-input w-full px-3 py-2 rounded-lg text-sm ${disBg}" onchange="AutoSendModule.updateObjectField(${stepIndex}, 'systemType', this.value)"${dis}>
                     ${(meta?.systemTypes || []).map(item => `<option value="${item.value}" ${Number(item.value) === Number(value) ? 'selected' : ''}>${escapeHtml(item.label)}</option>`).join('')}
                 </select>
             </div>
         `;
     }
 
-    function renderComponentTypeSelect(value, stepIndex, objectIndex, systemType) {
+    function renderComponentTypeSelect(value, stepIndex, systemType) {
         const locked = isSystemTemplate();
         const dis = locked ? ' disabled' : '';
         const disBg = locked ? 'bg-jd-content text-jd-text cursor-default' : 'bg-white';
@@ -553,49 +530,49 @@ const AutoSendModule = (function() {
         return `
             <div>
                 <label class="block text-xs text-jd-textSecondary mb-1.5">部件类型</label>
-                <select class="jd-input w-full px-3 py-2 rounded-lg text-sm ${disBg}" onchange="AutoSendModule.updateObjectField(${stepIndex}, ${objectIndex}, 'componentType', this.value)"${dis}>
+                <select class="jd-input w-full px-3 py-2 rounded-lg text-sm ${disBg}" onchange="AutoSendModule.updateObjectField(${stepIndex}, 'componentType', this.value)"${dis}>
                     ${filtered.map(item => `<option value="${item.value}" ${Number(item.value) === Number(validValue) ? 'selected' : ''}>${escapeHtml(item.label)}</option>`).join('')}
                 </select>
             </div>
         `;
     }
 
-    function renderAnalogTypeSelect(value, stepIndex, objectIndex) {
+    function renderAnalogTypeSelect(value, stepIndex) {
         const locked = isSystemTemplate();
         const dis = locked ? ' disabled' : '';
         const disBg = locked ? 'bg-jd-content text-jd-text cursor-default' : 'bg-white';
         return `
             <div>
                 <label class="block text-xs text-jd-textSecondary mb-1.5">模拟量类型</label>
-                <select class="jd-input w-full px-3 py-2 rounded-lg text-sm ${disBg}" onchange="AutoSendModule.updateObjectField(${stepIndex}, ${objectIndex}, 'analogType', this.value)"${dis}>
+                <select class="jd-input w-full px-3 py-2 rounded-lg text-sm ${disBg}" onchange="AutoSendModule.updateObjectField(${stepIndex}, 'analogType', this.value)"${dis}>
                     ${(meta?.analogTypes || []).map(item => `<option value="${item.value}" ${Number(item.value) === Number(value) ? 'selected' : ''}>${escapeHtml(item.label)}</option>`).join('')}
                 </select>
             </div>
         `;
     }
 
-    function renderPresetSelect(label, presetKey, value, stepIndex, objectIndex, fieldName) {
+    function renderPresetSelect(label, presetKey, value, stepIndex, fieldName) {
         const locked = isSystemTemplate();
         const dis = locked ? ' disabled' : '';
         const disBg = locked ? 'bg-jd-content text-jd-text cursor-default' : 'bg-white';
         return `
             <div>
                 <label class="block text-xs text-jd-textSecondary mb-1.5">${label}</label>
-                <select class="jd-input w-full px-3 py-2 rounded-lg text-sm ${disBg}" onchange="AutoSendModule.updateObjectField(${stepIndex}, ${objectIndex}, '${fieldName}', this.value)"${dis}>
+                <select class="jd-input w-full px-3 py-2 rounded-lg text-sm ${disBg}" onchange="AutoSendModule.updateObjectField(${stepIndex}, '${fieldName}', this.value)"${dis}>
                     ${(meta?.statusPresets?.[presetKey] || []).map(item => `<option value="${item.value}" ${Number(item.value) === Number(value) ? 'selected' : ''}>${escapeHtml(item.label)}</option>`).join('')}
                 </select>
             </div>
         `;
     }
 
-    function renderNumberInput(label, value, stepIndex, objectIndex, fieldName) {
+    function renderNumberInput(label, value, stepIndex, fieldName) {
         const locked = isSystemTemplate();
         const dis = locked ? ' disabled' : '';
         const disBg = locked ? 'bg-jd-content text-jd-text cursor-default' : 'bg-white';
         return `
             <div>
                 <label class="block text-xs text-jd-textSecondary mb-1.5">${label}</label>
-                <input type="number" min="0" step="1" class="jd-input w-full px-3 py-2 rounded-lg text-sm ${disBg}" value="${Number(value || 0)}"${dis} oninput="AutoSendModule.updateObjectField(${stepIndex}, ${objectIndex}, '${fieldName}', this.value)">
+                <input type="number" min="0" step="1" class="jd-input w-full px-3 py-2 rounded-lg text-sm ${disBg}" value="${Number(value || 0)}"${dis} oninput="AutoSendModule.updateObjectField(${stepIndex}, '${fieldName}', this.value)">
             </div>
         `;
     }
@@ -750,10 +727,8 @@ const AutoSendModule = (function() {
 
     function reconcileStepObjects(step) {
         const allowed = getAllowedObjectTypes(step.packetHeader.typeFlag);
-        step.objects = (step.objects || []).filter(item => allowed.includes(item.objectType));
-        if (!step.objects.length) {
-            step.objects = [createObject(allowed[0] || 'component_status')];
-        }
+        if (step.object && allowed.includes(step.object.objectType)) return;
+        step.object = createObject(allowed[0] || 'component_status');
     }
 
     function addStep() {
@@ -771,7 +746,7 @@ const AutoSendModule = (function() {
         const cloned = JSON.parse(JSON.stringify(source));
         cloned.id = generateId('step');
         cloned.name = `${source.name || `步骤${stepIndex + 1}`} 副本`;
-        cloned.objects = (cloned.objects || []).map(obj => ({ ...obj, id: generateId('obj') }));
+        if (cloned.object) cloned.object = { ...cloned.object, id: generateId('obj') };
         currentScene.steps.splice(stepIndex + 1, 0, cloned);
         previewSteps = [];
         renderSteps();
@@ -792,30 +767,9 @@ const AutoSendModule = (function() {
         
     }
 
-    function addObject(stepIndex) {
+    function updateObjectType(stepIndex, objectType) {
         const step = currentScene?.steps?.[stepIndex];
-        if (!step) return;
-        const objectType = getAllowedObjectTypes(step.packetHeader.typeFlag)[0] || 'component_status';
-        step.objects.push(createObject(objectType));
-        previewSteps = [];
-        renderSteps();
-    }
-
-    function removeObject(stepIndex, objectIndex) {
-        const step = currentScene?.steps?.[stepIndex];
-        if (!step?.objects?.[objectIndex]) return;
-        if (step.objects.length === 1) {
-            showToast('每个步骤至少保留 1 个对象', 'error');
-            return;
-        }
-        step.objects.splice(objectIndex, 1);
-        previewSteps = [];
-        renderSteps();
-    }
-
-    function updateObjectType(stepIndex, objectIndex, objectType) {
-        const step = currentScene?.steps?.[stepIndex];
-        const obj = step?.objects?.[objectIndex];
+        const obj = step?.object;
         if (!obj) return;
         obj.objectType = objectType;
         obj.fields = createObject(objectType).fields;
@@ -823,8 +777,8 @@ const AutoSendModule = (function() {
         renderSteps();
     }
 
-    function updateObjectField(stepIndex, objectIndex, field, value) {
-        const obj = currentScene?.steps?.[stepIndex]?.objects?.[objectIndex];
+    function updateObjectField(stepIndex, field, value) {
+        const obj = currentScene?.steps?.[stepIndex]?.object;
         if (!obj) return;
         if (numericObjectFields.has(field)) {
             obj.fields[field] = value === '' ? '' : Number(value);
@@ -837,7 +791,6 @@ const AutoSendModule = (function() {
         } else {
             obj.fields[field] = value;
         }
-        // 系统类型变更时，联动重置部件类型
         if (field === 'systemType') {
             const filtered = getFilteredComponentTypes(obj.fields.systemType);
             const currentCT = Number(obj.fields.componentType);
@@ -920,6 +873,41 @@ const AutoSendModule = (function() {
         } catch (error) {
             console.error(error);
             showToast('模板保存失败', 'error');
+        }
+    }
+
+    async function deleteCurrentTemplate() {
+        if (!currentScene?.id || currentScene.source !== 'user') {
+            showToast('仅可删除本地自定义模板', 'error');
+            return;
+        }
+        await deleteTemplate(currentScene.id);
+    }
+
+    async function deleteTemplate(templateId) {
+        if (!templateId) return;
+        const template = templates.find(item => item.id === templateId);
+        if (!template || template.source === 'system') {
+            showToast('系统模板不可删除', 'error');
+            return;
+        }
+        try {
+            const response = await fetch(`/api/auto_send/templates/${templateId}`, { method: 'DELETE' });
+            const result = await response.json();
+            if (!response.ok || result.error) {
+                showToast(result.error || '删除失败', 'error');
+                return;
+            }
+            if (currentScene?.id === templateId) {
+                currentScene = null;
+                previewSteps = [];
+            }
+            await reloadTemplates();
+            renderAll();
+            showToast('模板已删除', 'success');
+        } catch (error) {
+            console.error(error);
+            showToast('删除模板失败', 'error');
         }
     }
 
@@ -1020,13 +1008,13 @@ const AutoSendModule = (function() {
         addStep,
         duplicateStep,
         removeStep,
-        addObject,
-        removeObject,
         updateObjectType,
         updateObjectField,
         previewCurrentScene,
         applyPreview,
         saveTemplate,
+        deleteCurrentTemplate,
+        deleteTemplate,
         startAutoSend,
         stopAutoSend,
         toggleAutoSend,
