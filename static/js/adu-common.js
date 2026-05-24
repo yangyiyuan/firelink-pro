@@ -232,7 +232,9 @@ const AduCommon = (function() {
                 ? 'text-jd-danger'
                 : field.accent === 'warning'
                     ? 'text-jd-warning'
-                    : 'text-jd-text';
+                    : field.accent === 'success'
+                        ? 'text-emerald-600'
+                        : 'text-jd-text';
         const interactive = byteRange && clickHandler
             ? `onclick="${clickHandler}(this,${byteRange[0]},${byteRange[1]})" data-clickable="1"`
             : '';
@@ -246,19 +248,37 @@ const AduCommon = (function() {
 
     function renderFlags(flags) {
         if (!flags || !flags.length) return '';
+        const hasActive = flags.some(f => f.active);
         return `
             <div class="space-y-1">
                 <div class="text-xs font-medium text-jd-text">状态位解码</div>
                 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-1">
-                    ${flags.map(flag => `
-                        <div class="rounded-lg border px-3 py-1.5 ${flag.active ? 'border-amber-200 bg-amber-50' : 'border-jd-cardBorder bg-white'}">
+                    ${flags.map(flag => {
+                        const isNormalHighlight = !hasActive && flag.bit === 0 && !flag.active;
+                        const cardStyle = flag.active
+                            ? 'border-amber-200 bg-amber-50'
+                            : isNormalHighlight
+                                ? 'border-emerald-200 bg-emerald-50'
+                                : 'border-jd-cardBorder bg-white';
+                        const badgeStyle = flag.active
+                            ? 'bg-amber-100 text-amber-700'
+                            : isNormalHighlight
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : 'bg-slate-100 text-jd-textMuted';
+                        const textStyle = flag.active
+                            ? 'text-amber-700'
+                            : isNormalHighlight
+                                ? 'text-emerald-700'
+                                : 'text-jd-text';
+                        return `
+                        <div class="rounded-lg border px-3 py-1.5 ${cardStyle}">
                             <div class="flex items-center justify-between gap-2">
                                 <span class="text-[11px] text-jd-textMuted">bit${flag.bit} · ${escapeHtml(flag.label)}</span>
-                                <span class="text-[10px] px-1.5 py-0.5 rounded-full ${flag.active ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-jd-textMuted'}">${flag.active ? '1' : '0'}</span>
+                                <span class="text-[10px] px-1.5 py-0.5 rounded-full ${badgeStyle}">${flag.active ? '1' : '0'}</span>
                             </div>
-                            <div class="text-sm font-medium ${flag.active ? 'text-amber-700' : 'text-jd-text'} mt-0.5">${escapeHtml(flag.text)}</div>
+                            <div class="text-sm font-medium ${textStyle} mt-0.5">${escapeHtml(flag.text)}</div>
                         </div>
-                    `).join('')}
+                    `;}).join('')}
                 </div>
             </div>
         `;
@@ -271,7 +291,8 @@ const AduCommon = (function() {
         if (/故障/.test(keywords)) return 'fault';
         if (/恢复/.test(keywords)) return 'recovery';
         if (/查岗/.test(keywords)) return 'duty';
-        return 'normal';
+        if (active.length === 0) return 'normal';
+        return '';
     }
 
     function getObjectCardStyle(severity) {
@@ -279,6 +300,7 @@ const AduCommon = (function() {
         if (severity === 'fault') return { wrap: 'border-amber-200 bg-amber-50/70', badge: 'bg-amber-100 text-amber-700', title: 'text-amber-700' };
         if (severity === 'recovery') return { wrap: 'border-emerald-200 bg-emerald-50/70', badge: 'bg-emerald-100 text-emerald-700', title: 'text-emerald-700' };
         if (severity === 'duty') return { wrap: 'border-sky-200 bg-sky-50/70', badge: 'bg-sky-100 text-sky-700', title: 'text-sky-700' };
+        if (severity === 'normal') return { wrap: 'border-emerald-200 bg-emerald-50/70', badge: 'bg-emerald-100 text-emerald-700', title: 'text-emerald-700' };
         return { wrap: 'border-jd-cardBorder bg-jd-content/50', badge: 'bg-slate-100 text-jd-textMuted', title: 'text-jd-text' };
     }
 
@@ -289,6 +311,7 @@ const AduCommon = (function() {
             : severity === 'fault' ? '故障'
             : severity === 'recovery' ? '恢复'
             : severity === 'duty' ? '查岗'
+            : severity === 'normal' ? '正常'
             : '信息';
         const fieldsHtml = (obj.fields || []).map(f => {
             const br = getByteRangeForObjectField(typeFlag, objIdx, f.label);

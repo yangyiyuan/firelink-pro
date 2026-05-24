@@ -15,7 +15,8 @@ from ..shared import (
 )
 
 
-def parse_system_status_objects(reader: ByteReader, info_count: int) -> List[Dict[str, Any]]:
+def parse_system_status_objects(reader: ByteReader, info_count: int, type_flag: int = 1, type_flag_name: str = '') -> List[Dict[str, Any]]:
+    is_restore = type_flag == 134
     objects = []
     for idx in range(info_count):
         system_type = reader.read_u8('系统类型')
@@ -24,15 +25,17 @@ def parse_system_status_objects(reader: ByteReader, info_count: int) -> List[Dic
         occurred_at = reader.read_time('状态发生时间')
         decoded = decode_flag_bits(status, st.SYSTEM_STATUS_BITS, 16)
         system_name = safe_name(SYSTEM_TYPE_CN, system_type, '未知系统')
+        fallback = '正常运行' if not decoded['active_labels'] else ('恢复正常' if is_restore else '正常/无激活状态位')
+        status_accent = 'success' if not decoded['active_labels'] else 'primary'
         objects.append({
             'index': idx + 1,
             'title': f'信息对象 {idx + 1}',
-            'summary': build_summary(system_name, decoded['active_labels'], '正常/无激活状态位'),
+            'summary': build_summary(system_name, decoded['active_labels'], fallback),
             'occurred_at': occurred_at,
             'fields': [
                 field('系统类型', f'{system_type} / {system_name}'),
                 field('系统地址', system_addr),
-                field('系统状态值', f'0x{status:04X} / {status}', mono=True, accent='primary'),
+                field('系统状态值', f'0x{status:04X} / {status}', mono=True, accent=status_accent),
                 field('状态时间', occurred_at, mono=True),
             ],
             'status_flags': decoded['flags'],
@@ -40,7 +43,8 @@ def parse_system_status_objects(reader: ByteReader, info_count: int) -> List[Dic
     return objects
 
 
-def parse_component_status_objects(reader: ByteReader, info_count: int) -> List[Dict[str, Any]]:
+def parse_component_status_objects(reader: ByteReader, info_count: int, type_flag: int = 2, type_flag_name: str = '') -> List[Dict[str, Any]]:
+    is_restore = type_flag in (135, 134)
     objects = []
     for idx in range(info_count):
         system_type = reader.read_u8('系统类型')
@@ -54,17 +58,19 @@ def parse_component_status_objects(reader: ByteReader, info_count: int) -> List[
         decoded = decode_flag_bits(status, st.COMPONENT_STATUS_BITS, 16)
         system_name = safe_name(SYSTEM_TYPE_CN, system_type, '未知系统')
         component_name = safe_name(COMPONENT_TYPE_CN, component_type, '未知部件')
+        fallback = '正常运行' if not decoded['active_labels'] else ('恢复正常' if is_restore else '无激活状态位')
+        status_accent = 'success' if not decoded['active_labels'] else 'primary'
         objects.append({
             'index': idx + 1,
             'title': f'信息对象 {idx + 1}',
-            'summary': build_summary(component_name, decoded['active_labels'], '无激活状态位'),
+            'summary': build_summary(component_name, decoded['active_labels'], fallback),
             'occurred_at': occurred_at,
             'fields': [
                 field('系统类型', f'{system_type} / {system_name}'),
                 field('系统地址', system_addr),
                 field('部件类型', f'{component_type} / {component_name}'),
                 field('部件地址', f'0x{component_addr:08X} / {format_bytes_hex(component_addr_raw)}', mono=True),
-                field('部件状态值', f'0x{status:04X} / {status}', mono=True, accent='primary'),
+                field('部件状态值', f'0x{status:04X} / {status}', mono=True, accent=status_accent),
                 field('部件说明', desc.rstrip(b'\x00').decode('gb18030', errors='ignore').strip() or '-'),
                 field('状态时间', occurred_at, mono=True),
             ],

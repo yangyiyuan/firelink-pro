@@ -248,7 +248,7 @@ def _system_templates() -> List[Dict[str, Any]]:
                 ),
                 _create_step(
                     '烟感恢复',
-                    135,
+                    2,
                     _create_object('component_status', {'componentType': 42, 'componentStatus': 0, 'description': '2号楼5层烟感恢复'}),
                     delay_after_sec=5,
                 ),
@@ -323,7 +323,7 @@ def _system_templates() -> List[Dict[str, Any]]:
                 ),
                 _create_step(
                     '烟感恢复',
-                    135,
+                    2,
                     _create_object('component_status', {'componentType': 42, 'componentStatus': 0, 'description': 'A区1层大厅烟感01恢复'}),
                     delay_after_sec=5,
                 ),
@@ -346,7 +346,7 @@ def _system_templates() -> List[Dict[str, Any]]:
                 ),
                 _create_step(
                     '部件恢复',
-                    135,
+                    2,
                     _create_object('component_status', {'componentType': 42, 'componentStatus': 0, 'description': 'A区1层烟感恢复'}),
                     delay_after_sec=5,
                 ),
@@ -381,7 +381,7 @@ def _system_templates() -> List[Dict[str, Any]]:
                 ),
                 _create_step(
                     '烟感恢复',
-                    135,
+                    2,
                     _create_object('component_status', {'componentType': 42, 'componentStatus': 0, 'description': 'A区1层大厅烟感01恢复'}),
                     delay_after_sec=5,
                 ),
@@ -465,7 +465,7 @@ def get_auto_send_meta() -> Dict[str, Any]:
     CATEGORY_OPTIONS = [
         {'value': 'fire', 'label': '火警报警', 'desc': '类型标志2·部件状态火警'},
         {'value': 'fault', 'label': '故障报警', 'desc': '类型标志2·部件状态故障'},
-        {'value': 'restore', 'label': '状态恢复', 'desc': '类型标志135·部件状态恢复'},
+        {'value': 'restore', 'label': '状态恢复', 'desc': '类型标志2·部件状态恢复'},
         {'value': 'linkage', 'label': '联动控制', 'desc': '类型标志2·启动/反馈'},
         {'value': 'supervise', 'label': '监管报警', 'desc': '类型标志2·部件状态监管'},
         {'value': 'analog', 'label': '模拟量监控', 'desc': '类型标志3·温度/烟雾/压力'},
@@ -478,7 +478,7 @@ def get_auto_send_meta() -> Dict[str, Any]:
     CATEGORY_DEFAULTS = {
         'fire':     {'typeFlag': 2, 'command': 2, 'objectType': 'component_status'},
         'fault':    {'typeFlag': 2, 'command': 2, 'objectType': 'component_status'},
-        'restore':  {'typeFlag': 135, 'command': 2, 'objectType': 'component_status'},
+        'restore':  {'typeFlag': 2, 'command': 2, 'objectType': 'component_status'},
         'linkage':  {'typeFlag': 2, 'command': 2, 'objectType': 'component_status'},
         'supervise': {'typeFlag': 2, 'command': 2, 'objectType': 'component_status'},
         'analog':   {'typeFlag': 3, 'command': 2, 'objectType': 'analog_value'},
