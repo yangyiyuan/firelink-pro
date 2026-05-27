@@ -728,7 +728,12 @@ const AutoSendModule = (function() {
     function updateSceneField(field, value) {
         if (!currentScene) return;
         currentScene[field] = value;
-        // 分类变更时自动推导命令字、类型标志和信息对象
+        if (field === 'name' || field === 'description' || field === 'loop') {
+            previewSteps = [];
+            renderToolbarState();
+            renderTemplateList();
+            return;
+        }
         if (field === 'category' && value !== 'sequence' && value !== 'custom' && categoryDefaults[value]) {
             const defaults = categoryDefaults[value];
             currentScene.steps.forEach(step => {
