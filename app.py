@@ -151,13 +151,7 @@ def record_receive_history(kind: str, host: str, port: int, timestamp: str, prot
 network_config_store = NetworkConfigStore()
 target_connection = None
 target_lock = threading.Lock()
-auto_scene_state = {
-    'running': False,
-    'thread': None,
-    'stop_event': None,
-    'run_id': None,
-    'scene_name': None,
-}
+auto_scene_runs = {}
 auto_scene_lock = threading.Lock()
 
 
@@ -305,9 +299,10 @@ def _recv_loop(sock: socket.socket, host: str, port: int, protocol: str = 'tcp')
 
     # 连接断开时联动停止正在运行的自动场景
     with auto_scene_lock:
-        if auto_scene_state['running'] and auto_scene_state['stop_event'] is not None:
-            auto_scene_state['stop_event'].set()
-            print('[DEBUG] 连接断开，已联动停止自动场景')
+        for run_id, run_info in auto_scene_runs.items():
+            if run_info.get('stop_event') is not None:
+                run_info['stop_event'].set()
+        print('[DEBUG] 连接断开，已联动停止自动场景')
 
     socketio.emit('target_disconnected', {})
     print(f'[DEBUG] _recv_loop 退出 => {host}:{port} 连接已断开')
@@ -400,35 +395,49 @@ def handle_stop_auto_send() -> None:
 def handle_start_auto_scene(data: dict[str, Any]) -> None:
     scene = data.get('scene') or {}
     network = data.get('network') or {}
-    host = network.get('host', data.get('host', '127.0.0.1'))
-    port = network.get('port', data.get('port', 8080))
-    protocol = network.get('protocol', data.get('protocol', 'tcp'))
+    _start_single_scene(scene, network)
+
+
+@socketio.on('start_auto_scenes')
+def handle_start_auto_scenes(data: dict[str, Any]) -> None:
+    scenes = data.get('scenes') or []
+    network = data.get('network') or {}
+    if not scenes:
+        emit('auto_scene_error', {'message': '未选择任何场景'})
+        return
+    for scene in scenes:
+        _start_single_scene(scene, network)
+
+
+def _start_single_scene(scene: dict, network: dict) -> None:
+    host = network.get('host', '127.0.0.1')
+    port = network.get('port', 8080)
+    protocol = network.get('protocol', 'tcp')
+    template_id = scene.get('id', '')
     print(f'[DEBUG] start_auto_scene => scene_name={scene.get("name")}, network={host}:{port}/{protocol}, steps={len(scene.get("steps", []))}')
 
     with auto_scene_lock:
-        if auto_scene_state['running']:
-            emit('auto_scene_error', {'message': '自动发送场景已在运行中'})
-            emit('error', {'message': '自动发送场景已在运行中'})
-            return
+        for rid, rinfo in auto_scene_runs.items():
+            if rinfo.get('template_id') == template_id and rinfo.get('running'):
+                emit('auto_scene_error', {'message': f'场景 {scene.get("name", "")} 已在运行中'})
+                return
 
         try:
             plan = build_scene_plan(scene)
         except Exception as exc:
             emit('auto_scene_error', {'message': str(exc)})
-            emit('error', {'message': str(exc)})
             return
 
         stop_event = threading.Event()
         run_id = new_run_id()
-        auto_scene_state.update(
-            {
-                'running': True,
-                'thread': None,
-                'stop_event': stop_event,
-                'run_id': run_id,
-                'scene_name': plan['scene_name'],
-            }
-        )
+        auto_scene_runs[run_id] = {
+            'running': True,
+            'thread': None,
+            'stop_event': stop_event,
+            'run_id': run_id,
+            'scene_name': plan['scene_name'],
+            'template_id': template_id,
+        }
 
     def run_auto_scene() -> None:
         global target_connection
@@ -441,13 +450,11 @@ def handle_start_auto_scene(data: dict[str, Any]) -> None:
                     if stop_event.is_set():
                         break
 
-                    # 每步发送前重建数据包，使业务流水号递增、时间标签刷新
                     fresh = rebuild_step_packet(step)
                     step['packet'] = fresh['packet']
                     step['packet_hex'] = fresh['packet_hex']
                     step['packet_view'] = fresh['packet_view']
 
-                    # 优先复用已建立的长连接，确保能接收服务器响应
                     with target_lock:
                         conn = target_connection
 
@@ -460,7 +467,6 @@ def handle_start_auto_scene(data: dict[str, Any]) -> None:
                     print(f'[DEBUG] run_auto_scene step={step_index} => use_connection={use_connection}, conn_host={conn.get("host") if conn else None}, conn_port={conn.get("port") if conn else None}, target_host={host}, target_port={target_port}')
 
                     if use_connection:
-                        # 通过长连接发送，_recv_loop 会自动接收响应
                         try:
                             if conn['protocol'] == 'tcp' and conn.get('socket'):
                                 conn['socket'].sendall(step['packet'])
@@ -485,7 +491,7 @@ def handle_start_auto_scene(data: dict[str, Any]) -> None:
                                 'step_name': step['name'],
                                 'step_index': step_index,
                                 'cycle_index': cycle_index,
-                                'template_id': plan['scene_id'],
+                                'template_id': template_id,
                                 'via_connection': True,
                             }
                             record_send_history(result)
@@ -510,18 +516,16 @@ def handle_start_auto_scene(data: dict[str, Any]) -> None:
                                 'step_name': step['name'],
                                 'step_index': step_index,
                                 'cycle_index': cycle_index,
-                                'template_id': plan['scene_id'],
+                                'template_id': template_id,
                                 'via_connection': True,
                             }
                             record_send_history(result)
-                            # 长连接断开时清理
                             with target_lock:
                                 if target_connection is not None:
                                     _close_target_connection()
                                     target_connection = None
                             socketio.emit('target_disconnected', {})
                     else:
-                        # 无长连接时降级为短连接发送（无法接收响应）
                         result = send_packet_network(
                             step['packet'],
                             host,
@@ -536,7 +540,7 @@ def handle_start_auto_scene(data: dict[str, Any]) -> None:
                                 'step_name': step['name'],
                                 'step_index': step_index,
                                 'cycle_index': cycle_index,
-                                'template_id': plan['scene_id'],
+                                'template_id': template_id,
                             },
                         )
                     packet_view = dict(step['packet_view'])
@@ -560,6 +564,7 @@ def handle_start_auto_scene(data: dict[str, Any]) -> None:
                             'cycle_index': cycle_index,
                             'scene_name': plan['scene_name'],
                             'run_id': run_id,
+                            'template_id': template_id,
                         },
                     )
                     print(f'[DEBUG] auto_scene_step_result => step={step_index}/{len(plan["steps"])}, cycle={cycle_index}, success={result.get("success")}, hex_len={result.get("length")}, via={"长连接" if result.get("via_connection") else "短连接"}')
@@ -574,6 +579,7 @@ def handle_start_auto_scene(data: dict[str, Any]) -> None:
                         'scene_name': plan['scene_name'],
                         'cycle_index': cycle_index,
                         'loop': plan['loop'],
+                        'template_id': template_id,
                     },
                 )
                 if stop_event.is_set() or not plan['loop']:
@@ -582,24 +588,15 @@ def handle_start_auto_scene(data: dict[str, Any]) -> None:
             print(f'[DEBUG] run_auto_scene CRASHED => {exc}')
             import traceback
             traceback.print_exc()
-            socketio.emit('auto_scene_error', {'message': str(exc), 'run_id': run_id})
-            socketio.emit('error', {'message': str(exc)})
+            socketio.emit('auto_scene_error', {'message': str(exc), 'run_id': run_id, 'template_id': template_id})
         finally:
             with auto_scene_lock:
-                auto_scene_state.update(
-                    {
-                        'running': False,
-                        'thread': None,
-                        'stop_event': None,
-                        'run_id': None,
-                        'scene_name': None,
-                    }
-                )
-            socketio.emit('auto_scene_stopped', {'run_id': run_id, 'scene_name': plan['scene_name']})
+                auto_scene_runs.pop(run_id, None)
+            socketio.emit('auto_scene_stopped', {'run_id': run_id, 'scene_name': plan['scene_name'], 'template_id': template_id})
 
     worker = threading.Thread(target=run_auto_scene, daemon=True)
     with auto_scene_lock:
-        auto_scene_state['thread'] = worker
+        auto_scene_runs[run_id]['thread'] = worker
     worker.start()
     emit(
         'auto_scene_started',
@@ -608,24 +605,38 @@ def handle_start_auto_scene(data: dict[str, Any]) -> None:
             'scene_name': plan['scene_name'],
             'step_count': len(plan['steps']),
             'loop': plan['loop'],
+            'template_id': template_id,
         },
     )
     print(f'[DEBUG] auto_scene_started => run_id={run_id}, scene_name={plan["scene_name"]}, steps={len(plan["steps"])}, loop={plan["loop"]}')
 
 
 @socketio.on('stop_auto_scene')
-def handle_stop_auto_scene() -> None:
-    thread = None
+def handle_stop_auto_scene(data: dict | None = None) -> None:
+    template_id = None
+    if data and isinstance(data, dict):
+        template_id = data.get('template_id')
+
     with auto_scene_lock:
-        stop_event = auto_scene_state['stop_event']
-        thread = auto_scene_state['thread']
-        if not auto_scene_state['running'] or stop_event is None:
-            emit('auto_scene_stopped', {'run_id': None, 'scene_name': ''})
+        if template_id:
+            targets = {rid: info for rid, info in auto_scene_runs.items() if info.get('template_id') == template_id}
+        else:
+            targets = dict(auto_scene_runs)
+
+        if not targets:
+            emit('auto_scene_stopped', {'run_id': None, 'scene_name': '', 'template_id': template_id})
             return
-        stop_event.set()
-    if thread:
-        thread.join(timeout=2)
-    emit('auto_scene_stopped', {'run_id': auto_scene_state['run_id'], 'scene_name': auto_scene_state['scene_name']})
+
+        threads = []
+        for rid, info in targets.items():
+            if info.get('stop_event') is not None:
+                info['stop_event'].set()
+            threads.append((rid, info.get('thread'), info.get('scene_name'), info.get('template_id')))
+
+    for rid, thread, scene_name, tid in threads:
+        if thread:
+            thread.join(timeout=2)
+        emit('auto_scene_stopped', {'run_id': rid, 'scene_name': scene_name or '', 'template_id': tid or ''})
 
 
 @socketio.on('connect_target')

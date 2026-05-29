@@ -178,7 +178,19 @@
                             <!-- Auto Send Controls -->
                             <div class="flex items-center gap-2 min-w-0">
                                 <span class="text-xs text-jd-textMuted">自动发送</span>
-                                <select id="autoSceneSummary" class="jd-input pl-3 py-1 rounded text-xs bg-white" style="width:180px"></select>
+                                <div id="autoMultiSelect" class="relative">
+                                    <div id="autoMultiSelectTrigger" class="jd-input pl-3 py-1 rounded text-xs bg-white cursor-pointer flex items-center justify-between gap-1 select-none" style="width:220px;min-height:28px">
+                                        <span id="autoMultiSelectText" class="truncate text-jd-textMuted">选择场景</span>
+                                        <svg class="w-3.5 h-3.5 text-jd-textMuted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                    </div>
+                                    <div id="autoMultiSelectDropdown" class="absolute z-50 mt-1 bg-white border border-jd-cardBorder rounded-lg shadow-lg py-1 hidden" style="width:280px;max-height:280px;overflow-y:auto">
+                                        <div class="px-2 py-1.5 border-b border-jd-cardBorder flex items-center gap-2">
+                                            <button id="autoMultiSelectAll" class="text-[11px] text-jd-primary hover:text-jd-primaryHover" onclick="AutoSendModule.toggleSelectAll()">全选</button>
+                                            <button id="autoMultiSelectNone" class="text-[11px] text-jd-primary hover:text-jd-primaryHover" onclick="AutoSendModule.deselectAll()">清空</button>
+                                        </div>
+                                        <div id="autoMultiSelectOptions"></div>
+                                    </div>
+                                </div>
                                 <button class="btn-success flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium" id="btnAutoSend" onclick="AutoSendModule.toggleAutoSend()">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>

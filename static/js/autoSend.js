@@ -7,6 +7,9 @@ const AutoSendModule = (function() {
     let currentScene = null;
     let previewSteps = [];
     let autoSendRunning = false;
+    let selectedSceneIds = new Set();
+    let runningSceneIds = new Set();
+    let multiSelectOpen = false;
 
     function isSystemTemplate() {
         return currentScene?.source === 'system';
@@ -71,6 +74,7 @@ const AutoSendModule = (function() {
     function init(socketInstance) {
         socket = socketInstance;
         setupSocketListeners();
+        initMultiSelect();
         loadInitialData();
     }
 
@@ -91,6 +95,9 @@ const AutoSendModule = (function() {
                 categoryDefaults = meta.categoryDefaults;
             }
             currentScene = cloneScene(templates[0] || meta.defaultScene || createFallbackScene());
+            if (templates.length > 0 && selectedSceneIds.size === 0) {
+                selectedSceneIds.add(templates[0].id);
+            }
             renderAll();
         } catch (error) {
             console.error(error);
@@ -222,36 +229,21 @@ const AutoSendModule = (function() {
     }
 
     function renderToolbarState() {
-        const summary = document.getElementById('autoSceneSummary');
         const status = document.getElementById('autoRunStatus');
         const btn = document.getElementById('btnAutoSend');
         const btnText = document.getElementById('btnAutoSendText');
 
-        if (summary && summary.tagName === 'SELECT') {
-            const prevValue = summary.value;
-            summary.innerHTML = templates.map(t =>
-                `<option value="${t.id}"${t.id === currentScene?.id ? ' selected' : ''}>${t.name || '未命名场景'}</option>`
-            ).join('');
-            if (currentScene?.id) summary.value = currentScene.id;
-            else if (prevValue) summary.value = prevValue;
-            // 首次初始化 change 事件
-            if (!summary._autoSceneBound) {
-                summary._autoSceneBound = true;
-                summary.addEventListener('change', (e) => {
-                    selectTemplate(e.target.value);
-                });
-            }
-            if (typeof CustomSelect !== 'undefined') {
-                const inst = CustomSelect.init(summary, { size: 'sm' });
-                if (inst) CustomSelect.refresh(inst);
-            }
-        }
+        renderMultiSelectOptions();
 
         if (status) {
-            status.className = autoSendRunning
-                ? 'text-[11px] px-2 py-1 rounded-full bg-red-50 text-red-600'
-                : 'text-[11px] px-2 py-1 rounded-full bg-slate-100 text-jd-textMuted';
-            status.textContent = autoSendRunning ? '运行中' : '空闲';
+            if (autoSendRunning) {
+                const count = runningSceneIds.size;
+                status.className = 'text-[11px] px-2 py-1 rounded-full bg-red-50 text-red-600';
+                status.textContent = count > 1 ? `${count} 个运行中` : '运行中';
+            } else {
+                status.className = 'text-[11px] px-2 py-1 rounded-full bg-slate-100 text-jd-textMuted';
+                status.textContent = '空闲';
+            }
         }
 
         if (btn && btnText) {
@@ -266,7 +258,6 @@ const AutoSendModule = (function() {
             }
         }
 
-        // 系统模板时禁用保存模板和新增步骤按钮
         const locked = isSystemTemplate();
         const btnSave = document.getElementById('btnSaveTemplate');
         const btnAddStep = document.getElementById('btnAddStep');
@@ -274,6 +265,104 @@ const AutoSendModule = (function() {
         if (btnSave) btnSave.disabled = locked;
         if (btnAddStep) btnAddStep.disabled = locked;
         if (btnDelete) btnDelete.disabled = !currentScene || currentScene.source !== 'user';
+    }
+
+    function renderMultiSelectOptions() {
+        const optionsContainer = document.getElementById('autoMultiSelectOptions');
+        const textEl = document.getElementById('autoMultiSelectText');
+        if (!optionsContainer || !textEl) return;
+
+        const systemTemplates = templates.filter(t => t.source === 'system');
+        const userTemplates = templates.filter(t => t.source !== 'system');
+
+        let html = '';
+        if (systemTemplates.length) {
+            html += '<div class="px-2 py-1 text-[10px] text-jd-textMuted font-medium uppercase tracking-wider">系统预设</div>';
+            systemTemplates.forEach(t => {
+                const checked = selectedSceneIds.has(t.id) ? 'checked' : '';
+                const running = runningSceneIds.has(t.id);
+                html += `<label class="flex items-center gap-2 px-2 py-1.5 hover:bg-jd-primaryLight cursor-pointer text-xs ${running ? 'text-red-600 font-medium' : 'text-jd-text'}">
+                    <input type="checkbox" class="auto-scene-checkbox rounded border-jd-cardBorder text-jd-primary focus:ring-jd-primary" value="${t.id}" ${checked} ${running ? 'disabled' : ''} onchange="AutoSendModule.toggleSceneSelection('${t.id}')">
+                    <span class="truncate">${t.name || '未命名场景'}</span>
+                    ${running ? '<span class="ml-auto text-[10px] text-red-500">运行中</span>' : ''}
+                </label>`;
+            });
+        }
+        if (userTemplates.length) {
+            html += '<div class="px-2 py-1 text-[10px] text-jd-textMuted font-medium uppercase tracking-wider border-t border-jd-cardBorder mt-1 pt-1">用户自定义</div>';
+            userTemplates.forEach(t => {
+                const checked = selectedSceneIds.has(t.id) ? 'checked' : '';
+                const running = runningSceneIds.has(t.id);
+                html += `<label class="flex items-center gap-2 px-2 py-1.5 hover:bg-jd-primaryLight cursor-pointer text-xs ${running ? 'text-red-600 font-medium' : 'text-jd-text'}">
+                    <input type="checkbox" class="auto-scene-checkbox rounded border-jd-cardBorder text-jd-primary focus:ring-jd-primary" value="${t.id}" ${checked} ${running ? 'disabled' : ''} onchange="AutoSendModule.toggleSceneSelection('${t.id}')">
+                    <span class="truncate">${t.name || '未命名场景'}</span>
+                    ${running ? '<span class="ml-auto text-[10px] text-red-500">运行中</span>' : ''}
+                </label>`;
+            });
+        }
+
+        if (!templates.length) {
+            html = '<div class="px-2 py-3 text-xs text-jd-textMuted text-center">暂无场景</div>';
+        }
+
+        optionsContainer.innerHTML = html;
+
+        const count = selectedSceneIds.size;
+        if (count === 0) {
+            textEl.textContent = '选择场景';
+            textEl.className = 'truncate text-jd-textMuted';
+        } else if (count === 1) {
+            const t = templates.find(t => t.id === [...selectedSceneIds][0]);
+            textEl.textContent = t?.name || '1 个场景';
+            textEl.className = 'truncate text-jd-text';
+        } else {
+            textEl.textContent = `已选 ${count} 个场景`;
+            textEl.className = 'truncate text-jd-text';
+        }
+    }
+
+    function toggleSceneSelection(sceneId) {
+        if (runningSceneIds.has(sceneId)) return;
+        if (selectedSceneIds.has(sceneId)) {
+            selectedSceneIds.delete(sceneId);
+        } else {
+            selectedSceneIds.add(sceneId);
+        }
+        renderMultiSelectOptions();
+    }
+
+    function toggleSelectAll() {
+        const nonRunning = templates.filter(t => !runningSceneIds.has(t.id));
+        nonRunning.forEach(t => selectedSceneIds.add(t.id));
+        renderMultiSelectOptions();
+    }
+
+    function deselectAll() {
+        selectedSceneIds = new Set([...selectedSceneIds].filter(id => runningSceneIds.has(id)));
+        renderMultiSelectOptions();
+    }
+
+    function initMultiSelect() {
+        const trigger = document.getElementById('autoMultiSelectTrigger');
+        const dropdown = document.getElementById('autoMultiSelectDropdown');
+        if (!trigger || !dropdown) return;
+
+        trigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            multiSelectOpen = !multiSelectOpen;
+            dropdown.classList.toggle('hidden', !multiSelectOpen);
+        });
+
+        dropdown.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
+        document.addEventListener('click', () => {
+            if (multiSelectOpen) {
+                multiSelectOpen = false;
+                dropdown.classList.add('hidden');
+            }
+        });
     }
 
 
@@ -968,10 +1057,18 @@ const AutoSendModule = (function() {
             stopAutoSend();
             return;
         }
-        const valid = await previewCurrentScene();
-        if (!valid) return;
+
+        const scenesToStart = templates.filter(t => selectedSceneIds.has(t.id));
+        if (!scenesToStart.length) {
+            showToast('请先选择至少一个场景', 'error');
+            return;
+        }
+
         const network = NetworkModule.getNetworkConfig();
-        socket.emit('start_auto_scene', { scene: currentScene, network });
+        socket.emit('start_auto_scenes', {
+            scenes: scenesToStart.map(t => cloneScene(t)),
+            network,
+        });
     }
 
     function stopAutoSend() {
@@ -993,6 +1090,7 @@ const AutoSendModule = (function() {
     function setupSocketListeners() {
         socket.on('auto_scene_started', (data) => {
             autoSendRunning = true;
+            if (data.template_id) runningSceneIds.add(data.template_id);
             renderToolbarState();
             showToast(`自动发送已启动: ${data.scene_name}`, 'success');
         });
@@ -1012,7 +1110,8 @@ const AutoSendModule = (function() {
             const status = document.getElementById('autoRunStatus');
             if (status) {
                 status.className = 'text-[11px] px-2 py-1 rounded-full bg-red-50 text-red-600';
-                status.textContent = `执行 ${data.step_index}`;
+                const sceneLabel = runningSceneIds.size > 1 ? ` (${runningSceneIds.size} 场景)` : '';
+                status.textContent = `执行 ${data.step_index}${sceneLabel}`;
             }
         });
 
@@ -1026,14 +1125,24 @@ const AutoSendModule = (function() {
             }
         });
 
-        socket.on('auto_scene_stopped', () => {
-            autoSendRunning = false;
+        socket.on('auto_scene_stopped', (data) => {
+            if (data.template_id) {
+                runningSceneIds.delete(data.template_id);
+            } else {
+                runningSceneIds.clear();
+            }
+            autoSendRunning = runningSceneIds.size > 0;
             renderToolbarState();
             showToast('自动发送已停止', 'info');
         });
 
         socket.on('auto_scene_error', (data) => {
-            autoSendRunning = false;
+            if (data.template_id) {
+                runningSceneIds.delete(data.template_id);
+            } else {
+                runningSceneIds.clear();
+            }
+            autoSendRunning = runningSceneIds.size > 0;
             renderToolbarState();
             showToast(data.message || '自动发送失败', 'error');
         });
@@ -1074,5 +1183,8 @@ const AutoSendModule = (function() {
         getMeta: () => meta,
         getTemplates: () => templates,
         getCurrentScene: () => currentScene,
+        toggleSceneSelection,
+        toggleSelectAll,
+        deselectAll,
     };
 })();
