@@ -281,7 +281,7 @@ const AutoSendModule = (function() {
             systemTemplates.forEach(t => {
                 const checked = selectedSceneIds.has(t.id) ? 'checked' : '';
                 const running = runningSceneIds.has(t.id);
-                html += `<label class="flex items-center gap-2 px-2 py-1.5 hover:bg-jd-primaryLight cursor-pointer text-xs ${running ? 'text-red-600 font-medium' : 'text-jd-text'}">
+                html += `<label class="flex items-center gap-2 px-2 py-1.5 ${running ? 'opacity-50 cursor-not-allowed' : 'hover:bg-jd-primaryLight cursor-pointer'} text-xs ${running ? 'text-red-600 font-medium' : 'text-jd-text'}">
                     <input type="checkbox" class="auto-scene-checkbox rounded border-jd-cardBorder text-jd-primary focus:ring-jd-primary" value="${t.id}" ${checked} ${running ? 'disabled' : ''} onchange="AutoSendModule.toggleSceneSelection('${t.id}')">
                     <span class="truncate">${t.name || '未命名场景'}</span>
                     ${running ? '<span class="ml-auto text-[10px] text-red-500">运行中</span>' : ''}
@@ -293,7 +293,7 @@ const AutoSendModule = (function() {
             userTemplates.forEach(t => {
                 const checked = selectedSceneIds.has(t.id) ? 'checked' : '';
                 const running = runningSceneIds.has(t.id);
-                html += `<label class="flex items-center gap-2 px-2 py-1.5 hover:bg-jd-primaryLight cursor-pointer text-xs ${running ? 'text-red-600 font-medium' : 'text-jd-text'}">
+                html += `<label class="flex items-center gap-2 px-2 py-1.5 ${running ? 'opacity-50 cursor-not-allowed' : 'hover:bg-jd-primaryLight cursor-pointer'} text-xs ${running ? 'text-red-600 font-medium' : 'text-jd-text'}">
                     <input type="checkbox" class="auto-scene-checkbox rounded border-jd-cardBorder text-jd-primary focus:ring-jd-primary" value="${t.id}" ${checked} ${running ? 'disabled' : ''} onchange="AutoSendModule.toggleSceneSelection('${t.id}')">
                     <span class="truncate">${t.name || '未命名场景'}</span>
                     ${running ? '<span class="ml-auto text-[10px] text-red-500">运行中</span>' : ''}

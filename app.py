@@ -11,6 +11,8 @@ import os
 import socket
 import threading
 import time
+import traceback
+from collections import deque
 from typing import Any
 from urllib.parse import quote
 
@@ -82,8 +84,8 @@ def is_main_process() -> bool:
 
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'fire-alarm-simulator-secret-key')
-socketio = SocketIO(app, cors_allowed_origins='*', async_mode='threading')
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or 'fire-alarm-simulator-secret-key'
+socketio = SocketIO(app, cors_allowed_origins=os.environ.get('CORS_ORIGINS', '*'), async_mode='threading')
 
 template_last_modified = {}
 
@@ -114,9 +116,9 @@ if is_reloader_process():
 
 
 simulator = FireAlarmSimulator()
-send_history = []
+send_history = deque(maxlen=1000)
 send_history_lock = threading.Lock()
-max_history = 1000
+send_lock = threading.Lock()
 HISTORY_DIR = os.path.join(os.path.dirname(__file__), 'data', 'history')
 os.makedirs(HISTORY_DIR, exist_ok=True)
 
@@ -124,8 +126,6 @@ os.makedirs(HISTORY_DIR, exist_ok=True)
 def push_history(entry: dict[str, Any]) -> None:
     with send_history_lock:
         send_history.append(entry)
-        if len(send_history) > max_history:
-            send_history.pop(0)
 
 
 def record_send_history(result: dict[str, Any]) -> None:
@@ -298,11 +298,14 @@ def _recv_loop(sock: socket.socket, host: str, port: int, protocol: str = 'tcp')
             target_connection = None
 
     # 连接断开时联动停止正在运行的自动场景
+    stop_events = []
     with auto_scene_lock:
-        for run_id, run_info in auto_scene_runs.items():
+        for run_id, run_info in list(auto_scene_runs.items()):
             if run_info.get('stop_event') is not None:
-                run_info['stop_event'].set()
-        print('[DEBUG] 连接断开，已联动停止自动场景')
+                stop_events.append(run_info['stop_event'])
+    for ev in stop_events:
+        ev.set()
+    print('[DEBUG] 连接断开，已联动停止自动场景')
 
     socketio.emit('target_disconnected', {})
     print(f'[DEBUG] _recv_loop 退出 => {host}:{port} 连接已断开')
@@ -418,20 +421,20 @@ def _start_single_scene(scene: dict, network: dict) -> None:
 
     with auto_scene_lock:
         for rid, rinfo in auto_scene_runs.items():
-            if rinfo.get('template_id') == template_id and rinfo.get('running'):
+            if rinfo.get('template_id') == template_id:
                 emit('auto_scene_error', {'message': f'场景 {scene.get("name", "")} 已在运行中'})
                 return
 
-        try:
-            plan = build_scene_plan(scene)
-        except Exception as exc:
-            emit('auto_scene_error', {'message': str(exc)})
-            return
+    try:
+        plan = build_scene_plan(scene)
+    except Exception as exc:
+        emit('auto_scene_error', {'message': str(exc)})
+        return
 
-        stop_event = threading.Event()
-        run_id = new_run_id()
+    stop_event = threading.Event()
+    run_id = new_run_id()
+    with auto_scene_lock:
         auto_scene_runs[run_id] = {
-            'running': True,
             'thread': None,
             'stop_event': stop_event,
             'run_id': run_id,
@@ -468,12 +471,13 @@ def _start_single_scene(scene: dict, network: dict) -> None:
 
                     if use_connection:
                         try:
-                            if conn['protocol'] == 'tcp' and conn.get('socket'):
-                                conn['socket'].sendall(step['packet'])
-                            else:
-                                udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                                udp_sock.sendto(step['packet'], (conn['host'], conn['port']))
-                                udp_sock.close()
+                            with send_lock:
+                                if conn['protocol'] == 'tcp' and conn.get('socket'):
+                                    conn['socket'].sendall(step['packet'])
+                                else:
+                                    udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                                    udp_sock.sendto(step['packet'], (conn['host'], conn['port']))
+                                    udp_sock.close()
                             simulator.stats['total_sent'] += 1
                             result = {
                                 'success': True,
@@ -497,8 +501,7 @@ def _start_single_scene(scene: dict, network: dict) -> None:
                             record_send_history(result)
                         except Exception as exc:
                             print(f'[DEBUG] 长连接发送失败 => {exc}')
-                            import traceback as _tb
-                            _tb.print_exc()
+                            traceback.print_exc()
                             result = {
                                 'success': False,
                                 'error': str(exc),
@@ -586,7 +589,6 @@ def _start_single_scene(scene: dict, network: dict) -> None:
                     break
         except Exception as exc:
             print(f'[DEBUG] run_auto_scene CRASHED => {exc}')
-            import traceback
             traceback.print_exc()
             socketio.emit('auto_scene_error', {'message': str(exc), 'run_id': run_id, 'template_id': template_id})
         finally:
@@ -619,7 +621,7 @@ def handle_stop_auto_scene(data: dict | None = None) -> None:
 
     with auto_scene_lock:
         if template_id:
-            targets = {rid: info for rid, info in auto_scene_runs.items() if info.get('template_id') == template_id}
+            targets = {rid: info for rid, info in list(auto_scene_runs.items()) if info.get('template_id') == template_id}
         else:
             targets = dict(auto_scene_runs)
 
@@ -629,11 +631,13 @@ def handle_stop_auto_scene(data: dict | None = None) -> None:
 
         threads = []
         for rid, info in targets.items():
-            if info.get('stop_event') is not None:
-                info['stop_event'].set()
-            threads.append((rid, info.get('thread'), info.get('scene_name'), info.get('template_id')))
+            threads.append((rid, info.get('thread'), info.get('scene_name'), info.get('template_id'), info.get('stop_event')))
 
-    for rid, thread, scene_name, tid in threads:
+    for rid, thread, scene_name, tid, stop_ev in threads:
+        if stop_ev is not None:
+            stop_ev.set()
+
+    for rid, thread, scene_name, tid, _ in threads:
         if thread:
             thread.join(timeout=2)
         emit('auto_scene_stopped', {'run_id': rid, 'scene_name': scene_name or '', 'template_id': tid or ''})
@@ -714,12 +718,13 @@ def handle_send_via_connection(data: dict[str, Any]) -> None:
             packets = simulator.scene_full_fire_scenario()
             results = []
             for index, packet in enumerate(packets, start=1):
-                if conn['protocol'] == 'tcp' and conn['socket']:
-                    conn['socket'].sendall(packet)
-                else:
-                    udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                    udp_sock.sendto(packet, (conn['host'], conn['port']))
-                    udp_sock.close()
+                with send_lock:
+                    if conn['protocol'] == 'tcp' and conn['socket']:
+                        conn['socket'].sendall(packet)
+                    else:
+                        udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                        udp_sock.sendto(packet, (conn['host'], conn['port']))
+                        udp_sock.close()
                 simulator.stats['total_sent'] += 1
                 result = {
                     'success': True,
@@ -739,12 +744,13 @@ def handle_send_via_connection(data: dict[str, Any]) -> None:
             emit('send_result', {'success': True, 'results': results, 'scene': scene})
         else:
             packet = simulator.get_scene_packet(scene)
-            if conn['protocol'] == 'tcp' and conn['socket']:
-                conn['socket'].sendall(packet)
-            else:
-                udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                udp_sock.sendto(packet, (conn['host'], conn['port']))
-                udp_sock.close()
+            with send_lock:
+                if conn['protocol'] == 'tcp' and conn['socket']:
+                    conn['socket'].sendall(packet)
+                else:
+                    udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                    udp_sock.sendto(packet, (conn['host'], conn['port']))
+                    udp_sock.close()
             simulator.stats['total_sent'] += 1
             result = {
                 'success': True,
@@ -999,12 +1005,13 @@ def handle_start_signal_instance(data: dict[str, Any]) -> None:
             conn = target_connection
 
         if conn is not None:
-            if conn['protocol'] == 'tcp' and conn['socket']:
-                conn['socket'].sendall(packet)
-            else:
-                udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                udp_sock.sendto(packet, (conn['host'], conn['port']))
-                udp_sock.close()
+            with send_lock:
+                if conn['protocol'] == 'tcp' and conn['socket']:
+                    conn['socket'].sendall(packet)
+                else:
+                    udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                    udp_sock.sendto(packet, (conn['host'], conn['port']))
+                    udp_sock.close()
             simulator.stats['total_sent'] += 1
             result = {
                 'success': True,
