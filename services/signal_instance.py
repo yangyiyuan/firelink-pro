@@ -131,10 +131,10 @@ def _build_snapshot(catalog_item: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _patch_packet_addrs(packet: bytes, source_addr: int, dest_addr: int) -> bytes:
+def _patch_packet_addrs(packet: bytes, source_addr: int, dest_addr: int, addr_byte_order: str = 'little') -> bytes:
     pkt = bytearray(packet)
-    source_bytes = source_addr.to_bytes(6, byteorder='little')
-    dest_bytes = dest_addr.to_bytes(6, byteorder='little')
+    source_bytes = source_addr.to_bytes(6, byteorder=addr_byte_order)
+    dest_bytes = dest_addr.to_bytes(6, byteorder=addr_byte_order)
     pkt[12:18] = source_bytes
     pkt[18:24] = dest_bytes
     control_unit = bytes(pkt[2:27])
@@ -379,7 +379,7 @@ def _patch_packet_adu(packet: bytes, template_id: str, device: Dict[str, Any]) -
     return bytes(pkt)
 
 
-def resolve_instance_packet(instance: Dict[str, Any]) -> bytes:
+def resolve_instance_packet(instance: Dict[str, Any], addr_byte_order: str = 'little') -> bytes:
     template_id = instance.get('templateId', '')
     catalog_item = get_scene_catalog_item(template_id)
     if catalog_item is None:
@@ -397,22 +397,22 @@ def resolve_instance_packet(instance: Dict[str, Any]) -> bytes:
     source_addr = device.get('sourceAddr')
     dest_addr = device.get('destAddr')
     if source_addr or dest_addr:
-        src = _parse_addr(source_addr) if source_addr else int.from_bytes(packet[12:18], byteorder='little')
-        dst = _parse_addr(dest_addr) if dest_addr else int.from_bytes(packet[18:24], byteorder='little')
-        packet = _patch_packet_addrs(packet, src, dst)
+        src = _parse_addr(source_addr) if source_addr else int.from_bytes(packet[12:18], byteorder=addr_byte_order)
+        dst = _parse_addr(dest_addr) if dest_addr else int.from_bytes(packet[18:24], byteorder=addr_byte_order)
+        packet = _patch_packet_addrs(packet, src, dst, addr_byte_order=addr_byte_order)
 
     packet = _patch_packet_adu(packet, template_id, device)
 
     return packet
 
 
-def preview_instance(instance_id: str) -> Dict[str, Any]:
+def preview_instance(instance_id: str, addr_byte_order: str = 'little') -> Dict[str, Any]:
     instance = get_instance(instance_id)
     if instance is None:
         raise ValueError(f'实例 {instance_id} 不存在')
 
-    packet = resolve_instance_packet(instance)
-    packet_view = build_packet_view(packet, scene=instance.get('templateId', ''), timestamp=now_str())
+    packet = resolve_instance_packet(instance, addr_byte_order=addr_byte_order)
+    packet_view = build_packet_view(packet, addr_byte_order=addr_byte_order, scene=instance.get('templateId', ''), timestamp=now_str())
 
     return {
         'success': True,

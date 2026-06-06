@@ -120,6 +120,11 @@
                 </a>
             </nav>
             <div class="p-4 border-t border-jd-cardBorder sidebar-footer">
+                <div class="mb-3">
+                    <label class="text-[11px] font-medium text-jd-textMuted uppercase tracking-wider block mb-1.5 sidebar-footer-text">厂商配置</label>
+                    <select id="profileSelect" class="w-full text-sm rounded-lg border border-jd-cardBorder bg-white px-2.5 py-1.5 text-jd-text focus:outline-none focus:ring-1 focus:ring-jd-primary" onchange="ProfileModule.onProfileChange(this.value)">
+                    </select>
+                </div>
                 <div class="flex items-center gap-3">
                     <div class="w-8 h-8 rounded-full bg-jd-primaryLight border border-jd-primaryBorder flex items-center justify-center text-sm font-medium text-jd-primary shrink-0">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -728,6 +733,7 @@
     <script src="/static/js/parse.js"></script>
     <script src="/static/js/stats.js"></script>
     <script src="/static/js/panel.js"></script>
+    <script src="/static/js/profile.js"></script>
     <script src="/static/js/utils.js"></script>
     <script src="/static/js/main.js"></script>
 </body>

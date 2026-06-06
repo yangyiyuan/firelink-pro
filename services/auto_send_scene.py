@@ -608,7 +608,7 @@ def _build_object_bytes(object_type: str, fields: Dict[str, Any], step_index: in
     raise _field_error(step_index, 'objectType', f'不支持的对象类型: {object_type}')
 
 
-def _normalize_step(step: Dict[str, Any], step_index: int, scene_name: str) -> Dict[str, Any]:
+def _normalize_step(step: Dict[str, Any], step_index: int, scene_name: str, addr_byte_order: str = 'little') -> Dict[str, Any]:
     header = step.get('packetHeader') or {}
     type_flag = parse_int(header.get('typeFlag'), 2)
     if type_flag not in TYPE_FLAG_OBJECT_COMPATIBILITY:
@@ -649,10 +649,11 @@ def _normalize_step(step: Dict[str, Any], step_index: int, scene_name: str) -> D
     }
 
     adu = ADUBuilder.build_adu(type_flag, [payload])
-    packet_builder = GBT26875Packet(source_addr=source_addr, dest_addr=dest_addr, command=command)
+    packet_builder = GBT26875Packet(source_addr=source_addr, dest_addr=dest_addr, command=command, addr_byte_order=addr_byte_order)
     packet = packet_builder.build_packet(adu)
     packet_view = build_packet_view(
         packet,
+        addr_byte_order=addr_byte_order,
         scene_name=scene_name,
         step_id=step.get('id') or f'step_{step_index + 1}',
         step_name=name,
@@ -673,13 +674,13 @@ def _normalize_step(step: Dict[str, Any], step_index: int, scene_name: str) -> D
     }
 
 
-def build_scene_plan(scene: Dict[str, Any]) -> Dict[str, Any]:
+def build_scene_plan(scene: Dict[str, Any], addr_byte_order: str = 'little') -> Dict[str, Any]:
     payload = deep_copy(scene or {})
     scene_name = (payload.get('name') or '').strip() or '未命名场景'
     steps = payload.get('steps') or []
     if not steps:
         raise ValueError('场景至少需要 1 个步骤')
-    normalized_steps = [_normalize_step(step, index, scene_name) for index, step in enumerate(steps)]
+    normalized_steps = [_normalize_step(step, index, scene_name, addr_byte_order=addr_byte_order) for index, step in enumerate(steps)]
     return {
         'scene_id': payload.get('id') or '',
         'scene_name': scene_name,
@@ -691,7 +692,7 @@ def build_scene_plan(scene: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def rebuild_step_packet(step: Dict[str, Any]) -> Dict[str, Any]:
+def rebuild_step_packet(step: Dict[str, Any], addr_byte_order: str = 'little') -> Dict[str, Any]:
     type_flag = step['type_flag']
     command = step['command']
     source_addr = step['source_addr']
@@ -702,10 +703,11 @@ def rebuild_step_packet(step: Dict[str, Any]) -> Dict[str, Any]:
     object_bytes = [_build_object_bytes(obj['objectType'], obj['fields'], 0)]
 
     adu = ADUBuilder.build_adu(type_flag, object_bytes)
-    packet_builder = GBT26875Packet(source_addr=source_addr, dest_addr=dest_addr, command=command)
+    packet_builder = GBT26875Packet(source_addr=source_addr, dest_addr=dest_addr, command=command, addr_byte_order=addr_byte_order)
     packet = packet_builder.build_packet(adu)
     packet_view = build_packet_view(
         packet,
+        addr_byte_order=addr_byte_order,
         scene_name=scene_name,
         step_id=step['id'],
         step_name=step['name'],

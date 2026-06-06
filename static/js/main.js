@@ -16,6 +16,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // 初始化自定义下拉框
     CustomSelect.initAll();
 
+    // 初始化厂商配置
+    ProfileModule.init();
+
     // 设置侧边栏切换
     initSidebarToggle();
 

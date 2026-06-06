@@ -155,15 +155,17 @@ class GBT26875Packet:
     END_FLAG = b'\x23\x23'
     MAX_ADU_LENGTH = 1024
 
-    def __init__(self, source_addr: int = 0x000000000001, dest_addr: int = 0x000000000002, command: CommandType = CommandType.SEND_DATA, version_major: int = 1, version_minor: int = 0):
+    def __init__(self, source_addr: int = 0x000000000001, dest_addr: int = 0x000000000002, command: CommandType = CommandType.SEND_DATA, version_major: int = 1, version_minor: int = 0, addr_byte_order: str = 'little'):
         self.source_addr = source_addr
         self.dest_addr = dest_addr
         self.command = command
         self.version_major = version_major
         self.version_minor = version_minor
+        self.addr_byte_order = addr_byte_order
 
-    def _int_to_bytes(self, value: int, length: int, signed: bool = False) -> bytes:
-        return value.to_bytes(length, byteorder='little', signed=signed)
+    def _int_to_bytes(self, value: int, length: int, signed: bool = False, byteorder_override: str = '') -> bytes:
+        order = byteorder_override or 'little'
+        return value.to_bytes(length, byteorder=order, signed=signed)
 
     def _get_time_tag(self, dt: Optional[datetime.datetime] = None) -> bytes:
         dt = dt or datetime.datetime.now()
@@ -182,8 +184,8 @@ class GBT26875Packet:
             seq_bytes
             + version
             + self._get_time_tag()
-            + self._int_to_bytes(self.source_addr, 6)
-            + self._int_to_bytes(self.dest_addr, 6)
+            + self._int_to_bytes(self.source_addr, 6, byteorder_override=self.addr_byte_order)
+            + self._int_to_bytes(self.dest_addr, 6, byteorder_override=self.addr_byte_order)
             + self._int_to_bytes(len(adu), 2)
             + bytes([self.command])
         )
@@ -210,8 +212,8 @@ class GBT26875Packet:
             'version_major': control_unit[2],
             'version_minor': control_unit[3],
             'time_tag': time_str,
-            'source_addr': f"0x{int.from_bytes(control_unit[10:16], byteorder='little'):012x}",
-            'dest_addr': f"0x{int.from_bytes(control_unit[16:22], byteorder='little'):012x}",
+            'source_addr': f"0x{int.from_bytes(control_unit[10:16], byteorder=self.addr_byte_order):012x}",
+            'dest_addr': f"0x{int.from_bytes(control_unit[16:22], byteorder=self.addr_byte_order):012x}",
             'adu_length': adu_length,
             'command': control_unit[24],
             'adu': adu.hex(),
@@ -403,8 +405,8 @@ def enrich_packet_parse(parsed: Dict[str, Any]) -> Dict[str, Any]:
     return parsed
 
 
-def build_packet_view(packet: bytes, **extra_fields: Any) -> Dict[str, Any]:
-    packet_builder = GBT26875Packet()
+def build_packet_view(packet: bytes, addr_byte_order: str = 'little', **extra_fields: Any) -> Dict[str, Any]:
+    packet_builder = GBT26875Packet(addr_byte_order=addr_byte_order)
     parsed = packet_builder.parse_packet(packet)
     parsed['raw_hex'] = packet.hex()
     parsed['raw_length'] = len(packet)
@@ -413,8 +415,8 @@ def build_packet_view(packet: bytes, **extra_fields: Any) -> Dict[str, Any]:
 
 
 class FireAlarmSimulator:
-    def __init__(self, source_addr: int = 0x000000000001, dest_addr: int = 0x000000000002):
-        self.packet_builder = GBT26875Packet(source_addr=source_addr, dest_addr=dest_addr, command=CommandType.SEND_DATA)
+    def __init__(self, source_addr: int = 0x000000000001, dest_addr: int = 0x000000000002, addr_byte_order: str = 'little'):
+        self.packet_builder = GBT26875Packet(source_addr=source_addr, dest_addr=dest_addr, command=CommandType.SEND_DATA, addr_byte_order=addr_byte_order)
         self.adu_builder = ADUBuilder()
         self.running = False
         self.send_thread = None

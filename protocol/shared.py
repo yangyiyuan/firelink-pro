@@ -2,6 +2,7 @@ from typing import Any, Dict, List
 
 from . import standard as st
 from .profiles import jk_gh2013g as jk
+from .profiles import jd_f53
 
 COMMAND_CN = dict(st.COMMAND_CN)
 TYPE_FLAG_CN = {**st.TYPE_FLAG_CN, **jk.CUSTOM_TYPE_FLAG_CN}
@@ -120,3 +121,32 @@ def common_profile_notes(type_flag: int) -> List[str]:
     if type_flag in SYSTEM_ADDRESS_RELEVANT:
         notes.append(jk.SYSTEM_ADDRESS_SEMANTICS)
     return notes
+
+
+# 可用的厂商 profiles 列表（供前端选择）
+AVAILABLE_PROFILES = [
+    {
+        'key': '',
+        'name': '默认（国标规范）',
+        'addr_byte_order': 'little',
+    },
+    {
+        'key': jd_f53.PROFILE_KEY,
+        'name': jd_f53.PROFILE_NAME,
+        'addr_byte_order': jd_f53.ADDR_BYTE_ORDER,
+        'notes': jd_f53.PROFILE_NOTES,
+    },
+    {
+        'key': jk.PROFILE_KEY,
+        'name': jk.PROFILE_NAME,
+        'addr_byte_order': getattr(jk, 'ADDR_BYTE_ORDER', 'little'),
+        'notes': jk.PROFILE_NOTES,
+    },
+]
+
+
+def get_addr_byte_order_for_profile(profile_key: str) -> str:
+    for p in AVAILABLE_PROFILES:
+        if p['key'] == profile_key:
+            return p['addr_byte_order']
+    return 'little'

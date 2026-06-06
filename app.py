@@ -26,6 +26,10 @@ try:
         build_packet_view,
         sequence_manager,
     )
+    from fire_alarm_simulator.protocol.shared import (
+        AVAILABLE_PROFILES,
+        get_addr_byte_order_for_profile,
+    )
     from fire_alarm_simulator.services.auto_send_scene import (
         build_scene_plan,
         delete_template as delete_auto_scene_template,
@@ -52,6 +56,10 @@ except ModuleNotFoundError:
         FireAlarmSimulator,
         build_packet_view,
         sequence_manager,
+    )
+    from protocol.shared import (
+        AVAILABLE_PROFILES,
+        get_addr_byte_order_for_profile,
     )
     from services.auto_send_scene import (
         build_scene_plan,
@@ -149,6 +157,11 @@ def record_receive_history(kind: str, host: str, port: int, timestamp: str, prot
 
 
 network_config_store = NetworkConfigStore()
+current_profile_key = ''
+
+
+def _current_addr_byte_order() -> str:
+    return get_addr_byte_order_for_profile(current_profile_key)
 target_connection = None
 target_lock = threading.Lock()
 auto_scene_runs = {}
@@ -269,7 +282,7 @@ def _recv_loop(sock: socket.socket, host: str, port: int, protocol: str = 'tcp')
                 buf = buf[end_idx + 2 :]
 
                 try:
-                    parsed = build_packet_view(packet)
+                    parsed = build_packet_view(packet, addr_byte_order=_current_addr_byte_order())
                     parsed_at = now_ms()
                     record_receive_history('packet', host, port, parsed_at, parsed=parsed)
                     socketio.emit(
@@ -326,7 +339,7 @@ def handle_generate_packet(data: dict[str, Any]) -> None:
     scene = data.get('scene', 'single_fire')
     try:
         packet = simulator.get_scene_packet(scene)
-        emit('packet_generated', build_packet_view(packet, scene=scene, timestamp=now_ms()))
+        emit('packet_generated', build_packet_view(packet, addr_byte_order=_current_addr_byte_order(), scene=scene, timestamp=now_ms()))
     except Exception as exc:
         emit('error', {'message': str(exc)})
 
@@ -426,7 +439,7 @@ def _start_single_scene(scene: dict, network: dict) -> None:
                 return
 
     try:
-        plan = build_scene_plan(scene)
+        plan = build_scene_plan(scene, addr_byte_order=_current_addr_byte_order())
     except Exception as exc:
         emit('auto_scene_error', {'message': str(exc)})
         return
@@ -453,7 +466,7 @@ def _start_single_scene(scene: dict, network: dict) -> None:
                     if stop_event.is_set():
                         break
 
-                    fresh = rebuild_step_packet(step)
+                    fresh = rebuild_step_packet(step, addr_byte_order=_current_addr_byte_order())
                     step['packet'] = fresh['packet']
                     step['packet_hex'] = fresh['packet_hex']
                     step['packet_view'] = fresh['packet_view']
@@ -824,7 +837,7 @@ def parse_hex():
         return jsonify({'success': False, 'error': 'HEX数据不能为空'})
     try:
         packet = bytes.fromhex(hex_str.replace(' ', ''))
-        parsed = build_packet_view(packet)
+        parsed = build_packet_view(packet, addr_byte_order=_current_addr_byte_order())
         parsed['raw_hex'] = hex_str.replace(' ', '')
         return jsonify({'success': True, 'parsed': parsed})
     except Exception as exc:
@@ -875,7 +888,7 @@ def preview_auto_send_scene():
     data = request.get_json() or {}
     scene = data.get('scene') or data
     try:
-        plan = build_scene_plan(scene)
+        plan = build_scene_plan(scene, addr_byte_order=_current_addr_byte_order())
         steps = [
             {
                 'id': step['id'],
@@ -949,7 +962,7 @@ def delete_signal_instance(instance_id: str):
 @app.route('/api/signal_instances/<instance_id>/preview', methods=['POST'])
 def preview_signal_instance(instance_id: str):
     try:
-        result = preview_instance(instance_id)
+        result = preview_instance(instance_id, addr_byte_order=_current_addr_byte_order())
         return jsonify(result)
     except ValueError as exc:
         return jsonify({'success': False, 'error': str(exc)}), 400
@@ -963,8 +976,8 @@ def resolve_signal_instance(instance_id: str):
     if instance is None:
         return jsonify({'error': '实例不存在'}), 404
     try:
-        packet = resolve_instance_packet(instance)
-        packet_view = build_packet_view(packet, scene=instance.get('templateId', ''), timestamp=now_ms())
+        packet = resolve_instance_packet(instance, addr_byte_order=_current_addr_byte_order())
+        packet_view = build_packet_view(packet, addr_byte_order=_current_addr_byte_order(), scene=instance.get('templateId', ''), timestamp=now_ms())
         return jsonify({
             'instanceId': instance_id,
             'templateId': instance.get('templateId', ''),
@@ -992,7 +1005,7 @@ def handle_start_signal_instance(data: dict[str, Any]) -> None:
         return
 
     try:
-        packet = resolve_instance_packet(instance)
+        packet = resolve_instance_packet(instance, addr_byte_order=_current_addr_byte_order())
     except ValueError as exc:
         emit('signal_instance_error', {'message': str(exc)})
         emit('error', {'message': str(exc)})
@@ -1027,7 +1040,7 @@ def handle_start_signal_instance(data: dict[str, Any]) -> None:
         else:
             result = send_packet_network(packet, host, int(port), protocol, {'scene': instance.get('templateId', '')})
 
-        packet_view = build_packet_view(packet, scene=instance.get('templateId', ''), timestamp=now_ms())
+        packet_view = build_packet_view(packet, addr_byte_order=_current_addr_byte_order(), scene=instance.get('templateId', ''), timestamp=now_ms())
         emit('auto_scene_step_result', {
             **result,
             'packet_view': packet_view,
@@ -1390,6 +1403,38 @@ def delete_network_config(config_id: int):
     if network_config_store.delete(config_id):
         return jsonify({'success': True})
     return jsonify({'error': '配置不存在'}), 404
+
+
+@app.route('/api/profiles', methods=['GET'])
+def get_profiles():
+    return jsonify(AVAILABLE_PROFILES)
+
+
+@app.route('/api/profile', methods=['GET'])
+def get_current_profile():
+    addr_order = get_addr_byte_order_for_profile(current_profile_key)
+    return jsonify({'key': current_profile_key, 'addr_byte_order': addr_order})
+
+
+@app.route('/api/profile', methods=['PUT'])
+def set_current_profile():
+    global current_profile_key
+    data = request.get_json(silent=True) or {}
+    key = data.get('key', '')
+    valid_keys = [p['key'] for p in AVAILABLE_PROFILES]
+    if key not in valid_keys:
+        return jsonify({'error': f'无效的 profile key: {key}'}), 400
+    current_profile_key = key
+    addr_order = _current_addr_byte_order()
+    # 更新 simulator 的 packet_builder 以适配新字节序
+    simulator.packet_builder = GBT26875Packet(
+        source_addr=simulator.packet_builder.source_addr,
+        dest_addr=simulator.packet_builder.dest_addr,
+        command=simulator.packet_builder.command,
+        addr_byte_order=addr_order,
+    )
+    socketio.emit('profile_changed', {'key': current_profile_key, 'addr_byte_order': addr_order})
+    return jsonify({'key': current_profile_key, 'addr_byte_order': addr_order})
 
 
 if __name__ == '__main__':
