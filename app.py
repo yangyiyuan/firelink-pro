@@ -968,7 +968,7 @@ def delete_signal_instance(instance_id: str):
 @app.route('/api/signal_instances/<instance_id>/preview', methods=['POST'])
 def preview_signal_instance(instance_id: str):
     try:
-        result = preview_instance(instance_id, addr_byte_order=_current_addr_byte_order())
+        result = preview_instance(instance_id, addr_byte_order=_current_addr_byte_order(), component_addr_byteorder=_current_component_addr_byte_order())
         return jsonify(result)
     except ValueError as exc:
         return jsonify({'success': False, 'error': str(exc)}), 400
@@ -982,7 +982,7 @@ def resolve_signal_instance(instance_id: str):
     if instance is None:
         return jsonify({'error': '实例不存在'}), 404
     try:
-        packet = resolve_instance_packet(instance, addr_byte_order=_current_addr_byte_order())
+        packet = resolve_instance_packet(instance, addr_byte_order=_current_addr_byte_order(), component_addr_byteorder=_current_component_addr_byte_order())
         packet_view = build_packet_view(packet, addr_byte_order=_current_addr_byte_order(), component_addr_byteorder=_current_component_addr_byte_order(), scene=instance.get('templateId', ''), timestamp=now_ms())
         return jsonify({
             'instanceId': instance_id,
@@ -1011,7 +1011,7 @@ def handle_start_signal_instance(data: dict[str, Any]) -> None:
         return
 
     try:
-        packet = resolve_instance_packet(instance, addr_byte_order=_current_addr_byte_order())
+        packet = resolve_instance_packet(instance, addr_byte_order=_current_addr_byte_order(), component_addr_byteorder=_current_component_addr_byte_order())
     except ValueError as exc:
         emit('signal_instance_error', {'message': str(exc)})
         emit('error', {'message': str(exc)})

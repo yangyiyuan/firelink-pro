@@ -325,8 +325,11 @@ _PATCH_OBJ_SIZES = {
     21: 1 + 6 + 6,
 }
 
+# 部件地址子字段：这些字段需要按部件地址字节序写入
+_COMPONENT_ADDR_FIELDS = {'zoneNo', 'bitNo'}
 
-def _patch_packet_adu(packet: bytes, template_id: str, device: Dict[str, Any]) -> bytes:
+
+def _patch_packet_adu(packet: bytes, template_id: str, device: Dict[str, Any], component_addr_byteorder: str = 'little') -> bytes:
     pkt = bytearray(packet)
     control_unit = pkt[2:27]
     adu_length = int.from_bytes(control_unit[22:24], byteorder='little')
@@ -367,8 +370,10 @@ def _patch_packet_adu(packet: bytes, template_id: str, device: Dict[str, Any]) -
             val = device.get(field_name)
             if val is not None:
                 iv = int(val)
+                field_byteorder = component_addr_byteorder if field_name in _COMPONENT_ADDR_FIELDS else 'little'
+                iv_bytes = iv.to_bytes(byte_count, byteorder=field_byteorder)
                 for b in range(byte_count):
-                    pkt[adu_start + obj_offset + rel_off + b] = (iv >> (8 * b)) & 0xFF
+                    pkt[adu_start + obj_offset + rel_off + b] = iv_bytes[b]
 
         obj_offset += obj_size
 
@@ -379,7 +384,7 @@ def _patch_packet_adu(packet: bytes, template_id: str, device: Dict[str, Any]) -
     return bytes(pkt)
 
 
-def resolve_instance_packet(instance: Dict[str, Any], addr_byte_order: str = 'little') -> bytes:
+def resolve_instance_packet(instance: Dict[str, Any], addr_byte_order: str = 'little', component_addr_byteorder: str = 'little') -> bytes:
     template_id = instance.get('templateId', '')
     catalog_item = get_scene_catalog_item(template_id)
     if catalog_item is None:
@@ -401,18 +406,18 @@ def resolve_instance_packet(instance: Dict[str, Any], addr_byte_order: str = 'li
         dst = _parse_addr(dest_addr) if dest_addr else int.from_bytes(packet[18:24], byteorder=addr_byte_order)
         packet = _patch_packet_addrs(packet, src, dst, addr_byte_order=addr_byte_order)
 
-    packet = _patch_packet_adu(packet, template_id, device)
+    packet = _patch_packet_adu(packet, template_id, device, component_addr_byteorder=component_addr_byteorder)
 
     return packet
 
 
-def preview_instance(instance_id: str, addr_byte_order: str = 'little') -> Dict[str, Any]:
+def preview_instance(instance_id: str, addr_byte_order: str = 'little', component_addr_byteorder: str = 'little') -> Dict[str, Any]:
     instance = get_instance(instance_id)
     if instance is None:
         raise ValueError(f'实例 {instance_id} 不存在')
 
-    packet = resolve_instance_packet(instance, addr_byte_order=addr_byte_order)
-    packet_view = build_packet_view(packet, addr_byte_order=addr_byte_order, scene=instance.get('templateId', ''), timestamp=now_str())
+    packet = resolve_instance_packet(instance, addr_byte_order=addr_byte_order, component_addr_byteorder=component_addr_byteorder)
+    packet_view = build_packet_view(packet, addr_byte_order=addr_byte_order, component_addr_byteorder=component_addr_byteorder, scene=instance.get('templateId', ''), timestamp=now_str())
 
     return {
         'success': True,
