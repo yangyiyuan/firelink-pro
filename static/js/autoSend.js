@@ -1,4 +1,5 @@
 // 自动发送场景编排模块
+// 依赖: socket(init传入), SceneDataModule(sceneData.js), escapeHtml(utils.js), CustomSelect(customSelect.js), flatpickr
 const AutoSendModule = (function() {
     let socket;
     let meta = null;
@@ -15,10 +16,18 @@ const AutoSendModule = (function() {
         return currentScene?.source === 'system';
     }
 
-
     // 分类选项与默认值 — meta 加载后由后端填充
     let categoryOptions = null;
     let categoryDefaults = null;
+
+    /** 构建 SceneDataModule 需要的运行时上下文 */
+    function _stepOpts(stepIndex) {
+        return {
+            defaults: categoryDefaults?.[currentScene?.category],
+            stepIndex: stepIndex ?? (currentScene?.steps?.length ?? 0) + 1,
+            meta,
+        };
+    }
 
     function getCategoryLabel(value) {
         if (!categoryOptions) return value;
@@ -80,7 +89,7 @@ const AutoSendModule = (function() {
             if (meta?.categoryDefaults) {
                 categoryDefaults = meta.categoryDefaults;
             }
-            currentScene = cloneScene(templates[0] || meta.defaultScene || createFallbackScene());
+            currentScene = SceneDataModule.cloneScene(templates[0] || meta.defaultScene || SceneDataModule.createFallbackScene(_stepOpts()), _stepOpts());
             if (templates.length > 0 && selectedSceneIds.size === 0) {
                 selectedSceneIds.add(templates[0].id);
             }
@@ -116,83 +125,6 @@ const AutoSendModule = (function() {
                     <span class="text-sm">${AduCommon.escapeHtml(message)}</span>
                 </div>`;
         }
-    }
-
-
-    function createFallbackScene() {
-        return {
-            id: '',
-            name: '未命名场景',
-            category: 'custom',
-            description: '',
-            source: 'draft',
-            version: 2,
-            loop: true,
-            steps: [createStep(), createStep()]
-        };
-    }
-
-    function generateId(prefix) {
-        return `${prefix}_${Math.random().toString(16).slice(2, 10)}`;
-    }
-
-    function migrateStep(step) {
-        if (!step.object && step.objects) {
-            step.object = Array.isArray(step.objects) && step.objects.length > 0
-                ? step.objects[0]
-                : createObject();
-            delete step.objects;
-        } else if (!step.object) {
-            step.object = createObject();
-        }
-        return step;
-    }
-
-    function cloneScene(scene) {
-        const value = JSON.parse(JSON.stringify(scene || createFallbackScene()));
-        value.steps = (value.steps || []).map(step => {
-            migrateStep(step);
-            return {
-                ...step,
-                id: step.id || generateId('step'),
-                object: { ...step.object, id: step.object.id || generateId('obj') }
-            };
-        });
-        return value;
-    }
-
-    function createObject(objectType = 'component_status') {
-        const fields = objectType === 'system_status'
-            ? { systemType: 1, systemAddr: 1, systemStatus: 0, occurredAtMode: 'now', occurredAt: '' }
-            : objectType === 'analog_value'
-                ? { systemType: 1, systemAddr: 1, componentType: 31, bitNo: 1, zoneNo: 1, analogType: 3, analogValue: 850, occurredAtMode: 'now', occurredAt: '' }
-                : objectType === 'device_status'
-                    ? { statusByte: 0, occurredAtMode: 'now', occurredAt: '' }
-                    : { systemType: 1, systemAddr: 1, componentType: 42, bitNo: 1, zoneNo: 1, componentStatus: 2, description: '', occurredAtMode: 'now', occurredAt: '' };
-        return {
-            id: generateId('obj'),
-            objectType,
-            fields
-        };
-    }
-
-    function createStep(typeFlag = null) {
-        const defaults = categoryDefaults?.[currentScene?.category];
-        const effectiveTypeFlag = typeFlag ?? (defaults?.typeFlag ?? 2);
-        const effectiveCommand = defaults?.command ?? 2;
-        const primaryObjectType = getAllowedObjectTypes(effectiveTypeFlag)[0] || 'component_status';
-        return {
-            id: generateId('step'),
-            name: `步骤${(currentScene?.steps?.length || 0) + 1}`,
-            delayAfterSec: 5,
-            packetHeader: {
-                sourceAddr: '0x000000000001',
-                destAddr: '0x000000000002',
-                command: effectiveCommand,
-                typeFlag: effectiveTypeFlag
-            },
-            object: createObject(primaryObjectType)
-        };
     }
 
     function getAllowedObjectTypes(typeFlag) {
@@ -802,13 +734,13 @@ const AutoSendModule = (function() {
     function selectTemplate(templateId) {
         const template = templates.find(item => item.id === templateId);
         if (!template) return;
-        currentScene = cloneScene(template);
+        currentScene = SceneDataModule.cloneScene(template, _stepOpts());
         previewSteps = [];
         renderAll();
     }
 
     function createBlankScene() {
-        currentScene = cloneScene(meta?.defaultScene || createFallbackScene());
+        currentScene = SceneDataModule.cloneScene(meta?.defaultScene || SceneDataModule.createFallbackScene(_stepOpts()), _stepOpts());
         currentScene.id = '';
         currentScene.source = 'draft';
         currentScene.name = '未命名场景';
@@ -877,12 +809,12 @@ const AutoSendModule = (function() {
     function reconcileStepObjects(step) {
         const allowed = getAllowedObjectTypes(step.packetHeader.typeFlag);
         if (step.object && allowed.includes(step.object.objectType)) return;
-        step.object = createObject(allowed[0] || 'component_status');
+        step.object = SceneDataModule.createObject(allowed[0] || 'component_status');
     }
 
     function addStep() {
         if (!currentScene || isSystemTemplate()) return;
-        currentScene.steps.push(createStep());
+        currentScene.steps.push(SceneDataModule.createStep(_stepOpts()));
         previewSteps = [];
         renderSteps();
         renderToolbarState();
@@ -893,9 +825,9 @@ const AutoSendModule = (function() {
         const source = currentScene?.steps?.[stepIndex];
         if (!source) return;
         const cloned = JSON.parse(JSON.stringify(source));
-        cloned.id = generateId('step');
+        cloned.id = SceneDataModule.generateId('step');
         cloned.name = `${source.name || `步骤${stepIndex + 1}`} 副本`;
-        if (cloned.object) cloned.object = { ...cloned.object, id: generateId('obj') };
+        if (cloned.object) cloned.object = { ...cloned.object, id: SceneDataModule.generateId('obj') };
         currentScene.steps.splice(stepIndex + 1, 0, cloned);
         previewSteps = [];
         renderSteps();
@@ -921,7 +853,7 @@ const AutoSendModule = (function() {
         const obj = step?.object;
         if (!obj) return;
         obj.objectType = objectType;
-        obj.fields = createObject(objectType).fields;
+        obj.fields = SceneDataModule.createObject(objectType).fields;
         previewSteps = [];
         renderSteps();
     }
@@ -1015,7 +947,7 @@ const AutoSendModule = (function() {
                 showToast(result.error || '模板保存失败', 'error');
                 return;
             }
-            currentScene = cloneScene(result);
+            currentScene = SceneDataModule.cloneScene(result, _stepOpts());
             await reloadTemplates();
             renderAll();
             showToast(isUserTemplate ? '模板已更新' : '模板已保存', 'success');
@@ -1074,7 +1006,7 @@ const AutoSendModule = (function() {
 
         const network = NetworkModule.getNetworkConfig();
         socket.emit('start_auto_scenes', {
-            scenes: scenesToStart.map(t => cloneScene(t)),
+            scenes: scenesToStart.map(t => SceneDataModule.cloneScene(t, _stepOpts())),
             network,
         });
     }

@@ -247,6 +247,7 @@ def register_socketio_events(socketio, services):
         try:
             packet = resolve_instance_packet(
                 instance,
+                simulator,
                 addr_byte_order=_addr_byte_order(),
                 component_addr_byteorder=_component_addr_byte_order(),
             )

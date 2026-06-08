@@ -5,6 +5,7 @@
 from flask import Blueprint, jsonify, request
 
 from services.api.response_utils import error_response
+from services.api.validators import validate_host, validate_port
 
 
 def create_connection_bp(connection_mgr):
@@ -26,9 +27,13 @@ def create_connection_bp(connection_mgr):
         host = data.get('host', '').strip()
         port = data.get('port', 8080)
         protocol = data.get('protocol', 'tcp')
+        valid, msg = validate_host(host)
+        if not valid:
+            return error_response(msg)
+        valid, msg = validate_port(port)
+        if not valid:
+            return error_response(msg)
         result = connection_mgr.test_connection(host, port, protocol)
-        if not result.get('success') and result.get('error') in ('主机地址不能为空', '端口号无效'):
-            return error_response(result['error'])
         return jsonify(result)
 
     return bp

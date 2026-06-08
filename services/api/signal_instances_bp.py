@@ -22,7 +22,7 @@ from services.signal_instance import (
 from services.utils import now_ms_str as now_ms
 
 
-def create_signal_instances_bp(profile_state):
+def create_signal_instances_bp(profile_state, simulator):
     """Create and return the signal instances Blueprint.
 
     Parameters
@@ -30,6 +30,8 @@ def create_signal_instances_bp(profile_state):
     profile_state : dict
         Mutable dict holding ``{'key': current_profile_key}``.
         Used to compute addr byte orders at runtime.
+    simulator : FireAlarmSimulator
+        Protocol simulator instance for packet generation.
     """
     bp = Blueprint('signal_instances', __name__, url_prefix='/api')
 
@@ -83,6 +85,7 @@ def create_signal_instances_bp(profile_state):
         try:
             result = preview_instance(
                 instance_id,
+                simulator,
                 addr_byte_order=_addr_byte_order(),
                 component_addr_byteorder=_component_addr_byte_order(),
             )
@@ -100,6 +103,7 @@ def create_signal_instances_bp(profile_state):
         try:
             packet = resolve_instance_packet(
                 instance,
+                simulator,
                 addr_byte_order=_addr_byte_order(),
                 component_addr_byteorder=_component_addr_byte_order(),
             )

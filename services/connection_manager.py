@@ -380,7 +380,15 @@ class ConnectionManager:
                 )
 
                 buf += data
-                while len(buf) >= 4:
+                # 基于帧结构的精确解析，而非盲标记扫描
+                # 帧格式: @@(2B) + control_unit(25B) + ADU(adu_length B) + checksum(1B) + ##(2B)
+                # 最小帧长度 = 2 + 25 + 1 + 1 + 2 = 31 字节
+                MIN_FRAME_LEN = 31
+                CONTROL_UNIT_START = 2
+                CONTROL_UNIT_LEN = 25
+                ADU_LENGTH_OFFSET = CONTROL_UNIT_START + 22  # control_unit 内 adu_length 的起始位置
+
+                while len(buf) >= MIN_FRAME_LEN:
                     start_idx = buf.find(b'\x40\x40')
                     if start_idx == -1:
                         buf = b''
@@ -388,12 +396,34 @@ class ConnectionManager:
                     if start_idx > 0:
                         buf = buf[start_idx:]
 
-                    end_idx = buf.find(b'\x23\x23', 2)
-                    if end_idx == -1:
-                        break
+                    # 从 control unit 中读取 adu_length
+                    if len(buf) < CONTROL_UNIT_START + CONTROL_UNIT_LEN:
+                        break  # control unit 未收齐，等更多数据
 
-                    frame = buf[: end_idx + 2]
-                    buf = buf[end_idx + 2 :]
+                    adu_length = int.from_bytes(
+                        buf[ADU_LENGTH_OFFSET:ADU_LENGTH_OFFSET + 2],
+                        byteorder='little',
+                    )
+
+                    # 计算完整帧的总长度
+                    frame_len = 2 + CONTROL_UNIT_LEN + adu_length + 1 + 2
+
+                    if len(buf) < frame_len:
+                        break  # 帧未收齐，等更多数据
+
+                    # 验证结束标记
+                    if buf[frame_len - 2:frame_len] != b'\x23\x23':
+                        # 结束标记不对 — 跳过当前 @@，继续扫描下一个
+                        logger.warning(
+                            '帧结束标记校验失败: 期望 ##, 实际 %s (adu_length=%d)',
+                            buf[frame_len - 2:frame_len].hex(),
+                            adu_length,
+                        )
+                        buf = buf[2:]
+                        continue
+
+                    frame = buf[:frame_len]
+                    buf = buf[frame_len:]
 
                     try:
                         parsed = build_packet_view(

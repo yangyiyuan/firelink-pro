@@ -45,6 +45,7 @@ def register_all(app, socketio, services):
 
     app.register_blueprint(create_signal_instances_bp(
         profile_state=services['profile_state'],
+        simulator=services['simulator'],
     ))
 
     app.register_blueprint(create_auto_send_bp(

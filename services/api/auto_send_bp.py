@@ -17,6 +17,7 @@ from services.auto_send_scene import (
     save_template as save_auto_scene_template,
 )
 from services.api.response_utils import success_response, error_response
+from services.api.validators import validate_hex_string, validate_scene_structure
 
 
 def create_auto_send_bp(profile_state):
@@ -40,8 +41,9 @@ def create_auto_send_bp(profile_state):
     def parse_hex():
         data = request.get_json()
         hex_str = data.get('hex', '').strip()
-        if not hex_str:
-            return error_response('HEX数据不能为空')
+        valid, msg = validate_hex_string(hex_str)
+        if not valid:
+            return error_response(msg)
         try:
             packet = bytes.fromhex(hex_str.replace(' ', ''))
             parsed = build_packet_view(
@@ -66,6 +68,9 @@ def create_auto_send_bp(profile_state):
     def create_auto_send_template():
         data = request.get_json() or {}
         scene = data.get('scene') or data
+        valid, msg = validate_scene_structure(scene)
+        if not valid:
+            return error_response(msg)
         try:
             template = save_auto_scene_template(scene)
             return success_response(template, status_code=201)
@@ -92,6 +97,9 @@ def create_auto_send_bp(profile_state):
     def preview_auto_send_scene():
         data = request.get_json() or {}
         scene = data.get('scene') or data
+        valid, msg = validate_scene_structure(scene)
+        if not valid:
+            return error_response(msg)
         try:
             plan = build_scene_plan(
                 scene,

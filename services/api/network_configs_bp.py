@@ -5,6 +5,7 @@
 from flask import Blueprint, jsonify, request
 
 from services.api.response_utils import success_response, error_response
+from services.api.validators import validate_host, validate_port
 
 
 def create_network_configs_bp(network_config_store):
@@ -32,6 +33,12 @@ def create_network_configs_bp(network_config_store):
         data = request.get_json()
         if not data.get('name') or not data.get('host') or not data.get('port'):
             return error_response('缺少必要参数')
+        valid, msg = validate_host(data['host'])
+        if not valid:
+            return error_response(msg)
+        valid, msg = validate_port(data['port'])
+        if not valid:
+            return error_response(msg)
         new_config = network_config_store.create(data)
         return success_response(new_config, status_code=201)
 

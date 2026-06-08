@@ -1,4 +1,4 @@
-// 场景公共数据模块 — 集中定义模板分组、标签映射等共享数据
+// 场景公共数据模块 — 集中定义模板分组、标签映射、数据转换等共享数据与工具
 const SceneDataModule = (function() {
     // 模板分组标签（统一来源，消除 scene.js / signalInstance.js 中的不一致）
     const GROUP_MAP = {
@@ -18,5 +18,102 @@ const SceneDataModule = (function() {
         return GROUP_MAP[value] || value || '其他';
     }
 
-    return { GROUP_MAP, TEMPLATE_GROUPS, getGroupLabel };
+    // ---------- 场景数据转换工具（从 autoSend.js 提取） ----------
+
+    function generateId(prefix) {
+        return `${prefix}_${Math.random().toString(16).slice(2, 10)}`;
+    }
+
+    function createObject(objectType = 'component_status') {
+        const fields = objectType === 'system_status'
+            ? { systemType: 1, systemAddr: 1, systemStatus: 0, occurredAtMode: 'now', occurredAt: '' }
+            : objectType === 'analog_value'
+                ? { systemType: 1, systemAddr: 1, componentType: 31, bitNo: 1, zoneNo: 1, analogType: 3, analogValue: 850, occurredAtMode: 'now', occurredAt: '' }
+                : objectType === 'device_status'
+                    ? { statusByte: 0, occurredAtMode: 'now', occurredAt: '' }
+                    : { systemType: 1, systemAddr: 1, componentType: 42, bitNo: 1, zoneNo: 1, componentStatus: 2, description: '', occurredAtMode: 'now', occurredAt: '' };
+        return {
+            id: generateId('obj'),
+            objectType,
+            fields
+        };
+    }
+
+    function migrateStep(step) {
+        if (!step.object && step.objects) {
+            step.object = Array.isArray(step.objects) && step.objects.length > 0
+                ? step.objects[0]
+                : createObject();
+            delete step.objects;
+        } else if (!step.object) {
+            step.object = createObject();
+        }
+        return step;
+    }
+
+    /**
+     * 创建一个新步骤。
+     *
+     * @param {Object} opts - 运行时依赖项
+     * @param {number|null} opts.typeFlag - 指定 typeFlag，null 时从 defaults 推算
+     * @param {Object|null} opts.defaults - categoryDefaults（如 meta.categoryDefaults[category]）
+     * @param {number} opts.stepIndex - 步骤序号（用于命名）
+     * @param {Object|null} opts.meta - 协议元数据（用于 objectType 兼容性查询）
+     */
+    function createStep(opts = {}) {
+        const { typeFlag = null, defaults = null, stepIndex = 1, meta = null } = opts;
+        const effectiveTypeFlag = typeFlag ?? (defaults?.typeFlag ?? 2);
+        const effectiveCommand = defaults?.command ?? 2;
+        const compatibility = meta?.compatibility?.[String(effectiveTypeFlag)] || meta?.compatibility?.[effectiveTypeFlag];
+        const primaryObjectType = (compatibility || ['component_status'])[0];
+        return {
+            id: generateId('step'),
+            name: `步骤${stepIndex}`,
+            delayAfterSec: 5,
+            packetHeader: {
+                sourceAddr: '0x000000000001',
+                destAddr: '0x000000000002',
+                command: effectiveCommand,
+                typeFlag: effectiveTypeFlag
+            },
+            object: createObject(primaryObjectType)
+        };
+    }
+
+    /**
+     * 创建默认回退场景。
+     *
+     * @param {Object} opts - 运行时依赖项（与 createStep 相同）
+     */
+    function createFallbackScene(opts = {}) {
+        return {
+            id: '',
+            name: '未命名场景',
+            category: 'custom',
+            description: '',
+            source: 'draft',
+            version: 2,
+            loop: true,
+            steps: [createStep(opts), createStep({ ...opts, stepIndex: 2 })]
+        };
+    }
+
+    function cloneScene(scene, opts = {}) {
+        const value = JSON.parse(JSON.stringify(scene || createFallbackScene(opts)));
+        value.steps = (value.steps || []).map((step, idx) => {
+            migrateStep(step);
+            return {
+                ...step,
+                id: step.id || generateId('step'),
+                object: { ...step.object, id: step.object.id || generateId('obj') }
+            };
+        });
+        return value;
+    }
+
+    return {
+        GROUP_MAP, TEMPLATE_GROUPS, getGroupLabel,
+        generateId, createObject, migrateStep, createStep,
+        createFallbackScene, cloneScene
+    };
 })();

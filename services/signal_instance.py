@@ -35,15 +35,6 @@ TEMPLATE_STATUS_MAP = {
 
 _SCENE_MAP = {item['id']: item for item in SCENE_CATALOG}
 
-_simulator = None
-
-
-def _get_simulator() -> FireAlarmSimulator:
-    global _simulator
-    if _simulator is None:
-        _simulator = FireAlarmSimulator()
-    return _simulator
-
 
 def _load_instances() -> List[Dict[str, Any]]:
     if not os.path.exists(INSTANCE_FILE):
@@ -374,7 +365,7 @@ def _patch_packet_adu(packet: bytes, template_id: str, device: Dict[str, Any], c
     return bytes(pkt)
 
 
-def resolve_instance_packet(instance: Dict[str, Any], addr_byte_order: str = 'little', component_addr_byteorder: str = 'little') -> bytes:
+def resolve_instance_packet(instance: Dict[str, Any], simulator: FireAlarmSimulator, addr_byte_order: str = 'little', component_addr_byteorder: str = 'little') -> bytes:
     template_id = instance.get('templateId', '')
     catalog_item = get_scene_catalog_item(template_id)
     if catalog_item is None:
@@ -385,8 +376,7 @@ def resolve_instance_packet(instance: Dict[str, Any], addr_byte_order: str = 'li
             )
         raise ValueError(f'实例依赖的信号模板 {template_id} 不存在')
 
-    sim = _get_simulator()
-    packet = sim.get_scene_packet(template_id)
+    packet = simulator.get_scene_packet(template_id)
 
     device = instance.get('deviceParams', {})
     source_addr = device.get('sourceAddr')
@@ -401,12 +391,12 @@ def resolve_instance_packet(instance: Dict[str, Any], addr_byte_order: str = 'li
     return packet
 
 
-def preview_instance(instance_id: str, addr_byte_order: str = 'little', component_addr_byteorder: str = 'little') -> Dict[str, Any]:
+def preview_instance(instance_id: str, simulator: FireAlarmSimulator, addr_byte_order: str = 'little', component_addr_byteorder: str = 'little') -> Dict[str, Any]:
     instance = get_instance(instance_id)
     if instance is None:
         raise ValueError(f'实例 {instance_id} 不存在')
 
-    packet = resolve_instance_packet(instance, addr_byte_order=addr_byte_order, component_addr_byteorder=component_addr_byteorder)
+    packet = resolve_instance_packet(instance, simulator, addr_byte_order=addr_byte_order, component_addr_byteorder=component_addr_byteorder)
     packet_view = build_packet_view(packet, addr_byte_order=addr_byte_order, component_addr_byteorder=component_addr_byteorder, scene=instance.get('templateId', ''), timestamp=now_str())
 
     return {

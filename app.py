@@ -36,7 +36,11 @@ def is_main_process() -> bool:
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or 'fire-alarm-simulator-secret-key'
+_secret_key = os.environ.get('SECRET_KEY')
+if not _secret_key:
+    logger.warning('SECRET_KEY 未通过环境变量设置，使用硬编码后备值 — 生产环境请务必设置 SECRET_KEY')
+    _secret_key = 'fire-alarm-simulator-secret-key'
+app.config['SECRET_KEY'] = _secret_key
 socketio = SocketIO(app, cors_allowed_origins=os.environ.get('CORS_ORIGINS', '*'), async_mode='threading')
 
 # --- Template watcher (dev only) ---
