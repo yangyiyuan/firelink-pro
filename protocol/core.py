@@ -83,14 +83,14 @@ class SequenceManager:
 sequence_manager = SequenceManager()
 
 
-def parse_adu(adu_bytes: bytes) -> Dict[str, Any]:
+def parse_adu(adu_bytes: bytes, component_addr_byteorder: str = 'little') -> Dict[str, Any]:
     if len(adu_bytes) < 2:
         raise ValueError('ADU长度不足，至少需要2字节')
 
     type_flag = adu_bytes[0]
     info_count = adu_bytes[1]
     payload = adu_bytes[2:]
-    reader = ByteReader(payload)
+    reader = ByteReader(payload, component_addr_byteorder=component_addr_byteorder)
     type_name = TYPE_FLAG_CN.get(type_flag, f'未知类型({type_flag})')
     direction = direction_for_type(type_flag)
     type_origin = type_origin_for_flag(type_flag)
@@ -223,8 +223,8 @@ class GBT26875Packet:
 
 class ADUBuilder:
     @staticmethod
-    def _int_to_bytes(value: int, length: int, signed: bool = False) -> bytes:
-        return value.to_bytes(length, byteorder='little', signed=signed)
+    def _int_to_bytes(value: int, length: int, signed: bool = False, byteorder: str = 'little') -> bytes:
+        return value.to_bytes(length, byteorder=byteorder, signed=signed)
 
     @staticmethod
     def _get_time_tag(dt: Optional[datetime.datetime] = None) -> bytes:
@@ -243,12 +243,12 @@ class ADUBuilder:
         return bytes([system_type, system_addr]) + cls._int_to_bytes(status, 2) + cls._get_time_tag(dt)
 
     @classmethod
-    def build_component_status(cls, system_type: int, system_addr: int, component_type: int, component_addr: int, component_status: int, component_desc: str = '', dt: Optional[datetime.datetime] = None) -> bytes:
-        return bytes([system_type, system_addr, component_type]) + cls._int_to_bytes(component_addr, 4) + cls._int_to_bytes(component_status, 2) + cls._str_to_bytes(component_desc, 31) + cls._get_time_tag(dt)
+    def build_component_status(cls, system_type: int, system_addr: int, component_type: int, component_addr: int, component_status: int, component_desc: str = '', dt: Optional[datetime.datetime] = None, component_addr_byteorder: str = 'little') -> bytes:
+        return bytes([system_type, system_addr, component_type]) + cls._int_to_bytes(component_addr, 4, byteorder=component_addr_byteorder) + cls._int_to_bytes(component_status, 2) + cls._str_to_bytes(component_desc, 31) + cls._get_time_tag(dt)
 
     @classmethod
-    def build_analog_value(cls, system_type: int, system_addr: int, component_type: int, component_addr: int, analog_type: int, analog_value: int, dt: Optional[datetime.datetime] = None) -> bytes:
-        return bytes([system_type, system_addr, component_type]) + cls._int_to_bytes(component_addr, 4) + bytes([analog_type]) + cls._int_to_bytes(analog_value, 2, signed=True) + cls._get_time_tag(dt)
+    def build_analog_value(cls, system_type: int, system_addr: int, component_type: int, component_addr: int, analog_type: int, analog_value: int, dt: Optional[datetime.datetime] = None, component_addr_byteorder: str = 'little') -> bytes:
+        return bytes([system_type, system_addr, component_type]) + cls._int_to_bytes(component_addr, 4, byteorder=component_addr_byteorder) + bytes([analog_type]) + cls._int_to_bytes(analog_value, 2, signed=True) + cls._get_time_tag(dt)
 
     @classmethod
     def build_operation_info(cls, system_type: int, system_addr: int, op_flag: int, operator_no: int, dt: Optional[datetime.datetime] = None) -> bytes:
@@ -331,7 +331,7 @@ class ADUBuilder:
         return bytes([system_type, system_addr, text_len]) + encoded + cls._get_time_tag(dt)
 
     @classmethod
-    def build_component_config(cls, system_type: int, system_addr: int, component_type: int, component_addr: int, component_desc: str = '', dt: Optional[datetime.datetime] = None) -> bytes:
+    def build_component_config(cls, system_type: int, system_addr: int, component_type: int, component_addr: int, component_desc: str = '', dt: Optional[datetime.datetime] = None, component_addr_byteorder: str = 'little') -> bytes:
         """构建消防设施部件配置信息对象（TF=7）
 
         信息对象结构：
@@ -342,7 +342,7 @@ class ADUBuilder:
         - 部件说明（31字节）
         - 时间标签（6字节）
         """
-        return bytes([system_type, system_addr, component_type]) + cls._int_to_bytes(component_addr, 4) + cls._str_to_bytes(component_desc, 31) + cls._get_time_tag(dt)
+        return bytes([system_type, system_addr, component_type]) + cls._int_to_bytes(component_addr, 4, byteorder=component_addr_byteorder) + cls._str_to_bytes(component_desc, 31) + cls._get_time_tag(dt)
 
     @classmethod
     def build_system_time(cls, system_type: int, system_addr: int, reported_dt: Optional[datetime.datetime] = None, dt: Optional[datetime.datetime] = None) -> bytes:
@@ -385,10 +385,10 @@ class ADUBuilder:
         return adu + cls._get_time_tag(dt)
 
 
-def enrich_packet_parse(parsed: Dict[str, Any]) -> Dict[str, Any]:
+def enrich_packet_parse(parsed: Dict[str, Any], component_addr_byteorder: str = 'little') -> Dict[str, Any]:
     adu_hex = parsed.get('adu', '')
     adu_bytes = bytes.fromhex(adu_hex) if adu_hex else b''
-    adu_parsed = parse_adu(adu_bytes) if adu_bytes else None
+    adu_parsed = parse_adu(adu_bytes, component_addr_byteorder=component_addr_byteorder) if adu_bytes else None
     parsed['command_name'] = COMMAND_CN.get(parsed['command'], f'未知({parsed["command"]})')
     parsed['adu_parsed'] = adu_parsed
     parsed['adu_hex'] = adu_hex
@@ -405,13 +405,13 @@ def enrich_packet_parse(parsed: Dict[str, Any]) -> Dict[str, Any]:
     return parsed
 
 
-def build_packet_view(packet: bytes, addr_byte_order: str = 'little', **extra_fields: Any) -> Dict[str, Any]:
+def build_packet_view(packet: bytes, addr_byte_order: str = 'little', component_addr_byteorder: str = 'little', **extra_fields: Any) -> Dict[str, Any]:
     packet_builder = GBT26875Packet(addr_byte_order=addr_byte_order)
     parsed = packet_builder.parse_packet(packet)
     parsed['raw_hex'] = packet.hex()
     parsed['raw_length'] = len(packet)
     parsed.update(extra_fields)
-    return enrich_packet_parse(parsed)
+    return enrich_packet_parse(parsed, component_addr_byteorder=component_addr_byteorder)
 
 
 class FireAlarmSimulator:

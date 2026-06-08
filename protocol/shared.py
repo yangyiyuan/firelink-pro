@@ -61,9 +61,10 @@ def decode_flag_bits(value: int, definitions: List[Dict[str, str]], width: int) 
 
 
 class ByteReader:
-    def __init__(self, data: bytes):
+    def __init__(self, data: bytes, component_addr_byteorder: str = 'little'):
         self.data = data
         self.offset = 0
+        self.component_addr_byteorder = component_addr_byteorder
 
     def remaining(self) -> int:
         return len(self.data) - self.offset
@@ -83,6 +84,12 @@ class ByteReader:
 
     def read_s16(self, label: str) -> int:
         return int.from_bytes(self.read(2, label), byteorder='little', signed=True)
+
+    def read_component_addr(self, label: str = '部件地址') -> tuple:
+        """读取4字节部件地址，返回 (原始字节, 整数值)"""
+        raw = self.read(4, label)
+        value = int.from_bytes(raw, byteorder=self.component_addr_byteorder)
+        return raw, value
 
     def read_time(self, label: str) -> str:
         return decode_time_tag(self.read(6, label))
@@ -129,17 +136,20 @@ AVAILABLE_PROFILES = [
         'key': '',
         'name': '默认（国标规范）',
         'addr_byte_order': 'little',
+        'component_addr_byte_order': 'little',
     },
     {
         'key': jd_f53.PROFILE_KEY,
         'name': jd_f53.PROFILE_NAME,
         'addr_byte_order': jd_f53.ADDR_BYTE_ORDER,
+        'component_addr_byte_order': getattr(jd_f53, 'COMPONENT_ADDR_BYTE_ORDER', 'little'),
         'notes': jd_f53.PROFILE_NOTES,
     },
     {
         'key': jk.PROFILE_KEY,
         'name': jk.PROFILE_NAME,
         'addr_byte_order': getattr(jk, 'ADDR_BYTE_ORDER', 'little'),
+        'component_addr_byte_order': getattr(jk, 'COMPONENT_ADDR_BYTE_ORDER', 'little'),
         'notes': jk.PROFILE_NOTES,
     },
 ]
@@ -149,4 +159,11 @@ def get_addr_byte_order_for_profile(profile_key: str) -> str:
     for p in AVAILABLE_PROFILES:
         if p['key'] == profile_key:
             return p['addr_byte_order']
+    return 'little'
+
+
+def get_component_addr_byte_order_for_profile(profile_key: str) -> str:
+    for p in AVAILABLE_PROFILES:
+        if p['key'] == profile_key:
+            return p.get('component_addr_byte_order', 'little')
     return 'little'

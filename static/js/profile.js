@@ -1,6 +1,6 @@
 // 厂商配置模块
 const ProfileModule = (() => {
-    let currentProfile = { key: '', addr_byte_order: 'little' };
+    let currentProfile = { key: '', addr_byte_order: 'little', component_addr_byte_order: 'little' };
     let profiles = [];
 
     async function init() {
@@ -10,7 +10,7 @@ const ProfileModule = (() => {
             profiles = await resp.json();
         } catch (e) {
             console.error('加载厂商配置失败:', e);
-            profiles = [{ key: '', name: '默认（国标规范）', addr_byte_order: 'little' }];
+            profiles = [{ key: '', name: '默认（国标规范）', addr_byte_order: 'little', component_addr_byte_order: 'little' }];
         }
 
         // 渲染下拉选项
@@ -48,9 +48,13 @@ const ProfileModule = (() => {
         return currentProfile.addr_byte_order || 'little';
     }
 
+    function getComponentAddrByteOrder() {
+        return currentProfile.component_addr_byte_order || 'little';
+    }
+
     function getCurrentKey() {
         return currentProfile.key || '';
     }
 
-    return { init, onProfileChange, getAddrByteOrder, getCurrentKey };
+    return { init, onProfileChange, getAddrByteOrder, getComponentAddrByteOrder, getCurrentKey };
 })();

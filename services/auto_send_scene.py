@@ -570,7 +570,7 @@ def _component_addr_from_fields(fields: Dict[str, Any]) -> int:
     return bit_no | (zone_no << 16)
 
 
-def _build_object_bytes(object_type: str, fields: Dict[str, Any], step_index: int) -> bytes:
+def _build_object_bytes(object_type: str, fields: Dict[str, Any], step_index: int, component_addr_byteorder: str = 'little') -> bytes:
     builder = ADUBuilder()
     occurred_at = _parse_occured_at(fields)
     if object_type == 'system_status':
@@ -589,6 +589,7 @@ def _build_object_bytes(object_type: str, fields: Dict[str, Any], step_index: in
             parse_int(fields.get('analogType'), 3),
             parse_int(fields.get('analogValue'), 0),
             occurred_at,
+            component_addr_byteorder=component_addr_byteorder,
         )
     if object_type == 'device_status':
         return builder.build_device_status(
@@ -604,11 +605,12 @@ def _build_object_bytes(object_type: str, fields: Dict[str, Any], step_index: in
             parse_int(fields.get('componentStatus'), 0),
             str(fields.get('description') or ''),
             occurred_at,
+            component_addr_byteorder=component_addr_byteorder,
         )
     raise _field_error(step_index, 'objectType', f'不支持的对象类型: {object_type}')
 
 
-def _normalize_step(step: Dict[str, Any], step_index: int, scene_name: str, addr_byte_order: str = 'little') -> Dict[str, Any]:
+def _normalize_step(step: Dict[str, Any], step_index: int, scene_name: str, addr_byte_order: str = 'little', component_addr_byteorder: str = 'little') -> Dict[str, Any]:
     header = step.get('packetHeader') or {}
     type_flag = parse_int(header.get('typeFlag'), 2)
     if type_flag not in TYPE_FLAG_OBJECT_COMPATIBILITY:
@@ -634,7 +636,7 @@ def _normalize_step(step: Dict[str, Any], step_index: int, scene_name: str, addr
         )
     fields = obj.get('fields') or {}
     try:
-        payload = _build_object_bytes(object_type, fields, step_index)
+        payload = _build_object_bytes(object_type, fields, step_index, component_addr_byteorder=component_addr_byteorder)
     except ValueError as exc:
         raise _field_error(
             step_index,
@@ -674,13 +676,13 @@ def _normalize_step(step: Dict[str, Any], step_index: int, scene_name: str, addr
     }
 
 
-def build_scene_plan(scene: Dict[str, Any], addr_byte_order: str = 'little') -> Dict[str, Any]:
+def build_scene_plan(scene: Dict[str, Any], addr_byte_order: str = 'little', component_addr_byteorder: str = 'little') -> Dict[str, Any]:
     payload = deep_copy(scene or {})
     scene_name = (payload.get('name') or '').strip() or '未命名场景'
     steps = payload.get('steps') or []
     if not steps:
         raise ValueError('场景至少需要 1 个步骤')
-    normalized_steps = [_normalize_step(step, index, scene_name, addr_byte_order=addr_byte_order) for index, step in enumerate(steps)]
+    normalized_steps = [_normalize_step(step, index, scene_name, addr_byte_order=addr_byte_order, component_addr_byteorder=component_addr_byteorder) for index, step in enumerate(steps)]
     return {
         'scene_id': payload.get('id') or '',
         'scene_name': scene_name,
@@ -692,7 +694,7 @@ def build_scene_plan(scene: Dict[str, Any], addr_byte_order: str = 'little') -> 
     }
 
 
-def rebuild_step_packet(step: Dict[str, Any], addr_byte_order: str = 'little') -> Dict[str, Any]:
+def rebuild_step_packet(step: Dict[str, Any], addr_byte_order: str = 'little', component_addr_byteorder: str = 'little') -> Dict[str, Any]:
     type_flag = step['type_flag']
     command = step['command']
     source_addr = step['source_addr']
@@ -700,7 +702,7 @@ def rebuild_step_packet(step: Dict[str, Any], addr_byte_order: str = 'little') -
     scene_name = step.get('scene_name', '')
 
     obj = step.get('object', {})
-    object_bytes = [_build_object_bytes(obj['objectType'], obj['fields'], 0)]
+    object_bytes = [_build_object_bytes(obj['objectType'], obj['fields'], 0, component_addr_byteorder=component_addr_byteorder)]
 
     adu = ADUBuilder.build_adu(type_flag, object_bytes)
     packet_builder = GBT26875Packet(source_addr=source_addr, dest_addr=dest_addr, command=command, addr_byte_order=addr_byte_order)
@@ -708,6 +710,7 @@ def rebuild_step_packet(step: Dict[str, Any], addr_byte_order: str = 'little') -
     packet_view = build_packet_view(
         packet,
         addr_byte_order=addr_byte_order,
+        component_addr_byteorder=component_addr_byteorder,
         scene_name=scene_name,
         step_id=step['id'],
         step_name=step['name'],
