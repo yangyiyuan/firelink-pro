@@ -1,41 +1,25 @@
+import copy
 import datetime
 import json
 import os
 import uuid
 from typing import Any, Dict, List
 
-try:
-    from fire_alarm_simulator.protocol.core import ADUBuilder, GBT26875Packet, build_packet_view
-    from fire_alarm_simulator.protocol.shared import (
-        COMMAND_CN,
-        TYPE_FLAG_CN,
-        COMPONENT_TYPE_CN,
-        SYSTEM_TYPE_CN,
-        SYSTEM_TYPE_TO_COMPONENTS,
-        ANALOG_TYPE_META,
-    )
-    from fire_alarm_simulator.protocol.standard import (
-        COMPONENT_STATUS_BITS,
-        DEVICE_STATUS_BITS,
-        SYSTEM_STATUS_BITS,
-    )
-    from fire_alarm_simulator.services.common import deep_copy, now_str, parse_int
-except ModuleNotFoundError:
-    from protocol.core import ADUBuilder, GBT26875Packet, build_packet_view
-    from protocol.shared import (
-        COMMAND_CN,
-        TYPE_FLAG_CN,
-        COMPONENT_TYPE_CN,
-        SYSTEM_TYPE_CN,
-        SYSTEM_TYPE_TO_COMPONENTS,
-        ANALOG_TYPE_META,
-    )
-    from protocol.standard import (
-        COMPONENT_STATUS_BITS,
-        DEVICE_STATUS_BITS,
-        SYSTEM_STATUS_BITS,
-    )
-    from services.common import deep_copy, now_str, parse_int
+from protocol.core import ADUBuilder, GBT26875Packet, build_packet_view
+from protocol.shared import (
+    COMMAND_CN,
+    TYPE_FLAG_CN,
+    COMPONENT_TYPE_CN,
+    SYSTEM_TYPE_CN,
+    SYSTEM_TYPE_TO_COMPONENTS,
+    ANALOG_TYPE_META,
+)
+from protocol.standard import (
+    COMPONENT_STATUS_BITS,
+    DEVICE_STATUS_BITS,
+    SYSTEM_STATUS_BITS,
+)
+from services.utils import now_str, parse_int
 
 
 OBJECT_TYPE_META = {
@@ -498,16 +482,16 @@ def get_auto_send_meta() -> Dict[str, Any]:
             {'value': key, 'label': meta['label']}
             for key, meta in OBJECT_TYPE_META.items()
         ],
-        'compatibility': deep_copy(TYPE_FLAG_OBJECT_COMPATIBILITY),
+        'compatibility': copy.deepcopy(TYPE_FLAG_OBJECT_COMPATIBILITY),
         'statusPresets': {
-            'component_status': deep_copy(COMPONENT_STATUS_PRESETS),
-            'system_status': deep_copy(SYSTEM_STATUS_PRESETS),
-            'device_status': deep_copy(DEVICE_STATUS_PRESETS),
+            'component_status': copy.deepcopy(COMPONENT_STATUS_PRESETS),
+            'system_status': copy.deepcopy(SYSTEM_STATUS_PRESETS),
+            'device_status': copy.deepcopy(DEVICE_STATUS_PRESETS),
         },
         'statusBits': {
-            'component_status': deep_copy(COMPONENT_STATUS_BITS),
-            'system_status': deep_copy(SYSTEM_STATUS_BITS),
-            'device_status': deep_copy(DEVICE_STATUS_BITS),
+            'component_status': copy.deepcopy(COMPONENT_STATUS_BITS),
+            'system_status': copy.deepcopy(SYSTEM_STATUS_BITS),
+            'device_status': copy.deepcopy(DEVICE_STATUS_BITS),
         },
         'categories': CATEGORY_OPTIONS,
         'categoryDefaults': CATEGORY_DEFAULTS,
@@ -517,7 +501,7 @@ def get_auto_send_meta() -> Dict[str, Any]:
 
 def list_templates() -> List[Dict[str, Any]]:
     templates = _system_templates() + _load_user_templates()
-    return deep_copy(templates)
+    return copy.deepcopy(templates)
 
 
 def get_template(template_id: str) -> Dict[str, Any] | None:
@@ -529,7 +513,7 @@ def get_template(template_id: str) -> Dict[str, Any] | None:
 
 def save_template(scene: Dict[str, Any], template_id: str | None = None) -> Dict[str, Any]:
     user_templates = _load_user_templates()
-    payload = deep_copy(scene)
+    payload = copy.deepcopy(scene)
     payload['steps'] = payload.get('steps') or []
     payload['name'] = (payload.get('name') or '').strip() or '未命名模板'
     payload['category'] = payload.get('category') or 'custom'
@@ -543,12 +527,12 @@ def save_template(scene: Dict[str, Any], template_id: str | None = None) -> Dict
                 payload['id'] = template_id
                 user_templates[index] = payload
                 _save_user_templates(user_templates)
-                return deep_copy(payload)
+                return copy.deepcopy(payload)
 
     payload['id'] = f'user_{uuid.uuid4().hex[:10]}'
     user_templates.append(payload)
     _save_user_templates(user_templates)
-    return deep_copy(payload)
+    return copy.deepcopy(payload)
 
 
 def delete_template(template_id: str) -> bool:
@@ -647,7 +631,7 @@ def _normalize_step(step: Dict[str, Any], step_index: int, scene_name: str, addr
     normalized_object = {
         'id': obj.get('id') or f'obj_1',
         'objectType': object_type,
-        'fields': deep_copy(fields),
+        'fields': copy.deepcopy(fields),
     }
 
     adu = ADUBuilder.build_adu(type_flag, [payload])
@@ -677,7 +661,7 @@ def _normalize_step(step: Dict[str, Any], step_index: int, scene_name: str, addr
 
 
 def build_scene_plan(scene: Dict[str, Any], addr_byte_order: str = 'little', component_addr_byteorder: str = 'little') -> Dict[str, Any]:
-    payload = deep_copy(scene or {})
+    payload = copy.deepcopy(scene or {})
     scene_name = (payload.get('name') or '').strip() or '未命名场景'
     steps = payload.get('steps') or []
     if not steps:

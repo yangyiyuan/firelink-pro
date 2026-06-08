@@ -1,24 +1,16 @@
+import copy
 import json
 import os
 import uuid
 from typing import Any, Dict, List, Optional
 
-try:
-    from fire_alarm_simulator.protocol.core import (
-        SCENE_CATALOG,
-        FireAlarmSimulator,
-        GBT26875Packet,
-        build_packet_view,
-    )
-    from fire_alarm_simulator.services.common import deep_copy, now_str, parse_int
-except ModuleNotFoundError:
-    from protocol.core import (
-        SCENE_CATALOG,
-        FireAlarmSimulator,
-        GBT26875Packet,
-        build_packet_view,
-    )
-    from services.common import deep_copy, now_str, parse_int
+from protocol.core import (
+    SCENE_CATALOG,
+    FireAlarmSimulator,
+    GBT26875Packet,
+    build_packet_view,
+)
+from services.utils import now_str, parse_int
 
 
 SERVICE_DIR = os.path.dirname(os.path.dirname(__file__))
@@ -156,19 +148,19 @@ def _parse_addr(value: Any) -> int:
 
 def get_scene_catalog_item(template_id: str) -> Optional[Dict[str, Any]]:
     item = _SCENE_MAP.get(template_id)
-    return deep_copy(item) if item else None
+    return copy.deepcopy(item) if item else None
 
 
 def list_instances() -> List[Dict[str, Any]]:
     instances = _load_instances()
     instances.sort(key=lambda x: x.get('lastUsedAt') or x.get('updatedAt') or x.get('createdAt') or '', reverse=True)
-    return deep_copy(instances)
+    return copy.deepcopy(instances)
 
 
 def get_instance(instance_id: str) -> Optional[Dict[str, Any]]:
     for inst in _load_instances():
         if inst.get('id') == instance_id:
-            return deep_copy(inst)
+            return copy.deepcopy(inst)
     return None
 
 
@@ -213,7 +205,7 @@ def create_instance(data: Dict[str, Any]) -> Dict[str, Any]:
     instances = _load_instances()
     instances.append(instance)
     _save_instances(instances)
-    return deep_copy(instance)
+    return copy.deepcopy(instance)
 
 
 def update_instance(instance_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -262,7 +254,7 @@ def update_instance(instance_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
     existing['updatedAt'] = now_str()
     instances[target_index] = existing
     _save_instances(instances)
-    return deep_copy(existing)
+    return copy.deepcopy(existing)
 
 
 def delete_instance(instance_id: str) -> bool:

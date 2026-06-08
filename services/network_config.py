@@ -41,7 +41,7 @@ class NetworkConfigStore:
             with open(CONFIG_FILE, 'w', encoding='utf-8') as fh:
                 json.dump({'configs': self._configs, 'next_id': self._next_id}, fh, ensure_ascii=False, indent=2)
         except Exception as exc:
-            print(f'保存配置文件失败: {exc}')
+            logger.error('保存配置文件失败: %s', exc)
 
     def list_all(self) -> List[Dict[str, Any]]:
         return list(self._configs)

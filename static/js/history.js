@@ -124,7 +124,7 @@ const HistoryModule = (function() {
     // ==================== 发送记录 ====================
     function addSent(data) {
         const sceneName = data.scene_name || data.step_name || SceneModule.getSceneName(data.scene);
-        const hex = data.hex ? SceneModule.formatHex(data.hex) : '';
+        const hex = data.hex ? AduCommon.formatHex(data.hex) : '';
         renderItem({
             direction: 'send',
             label: '发送',
@@ -146,7 +146,7 @@ const HistoryModule = (function() {
     // ==================== 接收记录 ====================
     function addReceived(data) {
         const parsed = data.parsed || {};
-        const hex = parsed.raw_hex ? SceneModule.formatHex(parsed.raw_hex) : '';
+        const hex = parsed.raw_hex ? AduCommon.formatHex(parsed.raw_hex) : '';
         const commandName = parsed.command_name || '';
         const summary = parsed.adu_summary || parsed.type_flag_name || commandName || '未知类型';
         const typeOriginLabel = parsed.adu_parsed?.type_origin_label || '';
@@ -179,7 +179,7 @@ const HistoryModule = (function() {
 
     function addReceivedRaw(data) {
         const hex = data.data_hex
-            ? SceneModule.formatHex(data.data_hex)
+            ? AduCommon.formatHex(data.data_hex)
             : '';
         renderItem({
             direction: 'recv',
@@ -431,7 +431,7 @@ const HistoryModule = (function() {
 
                 <section class="space-y-2">
                     <div class="text-xs text-jd-textMuted">原始报文 (${escapeHtml(data.raw_length)} 字节)</div>
-                    <div class="raw-hex-box hex-display">${SceneModule.formatHex(data.raw_hex)}</div>
+                    <div class="raw-hex-box hex-display">${AduCommon.formatHex(data.raw_hex)}</div>
                 </section>
             </div>
         `;

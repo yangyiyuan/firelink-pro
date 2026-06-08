@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fire-alarm-simulator"
+version = "1.0.0"
+description = "GBT 26875.3-2011 fire alarm data simulator"
+requires-python = ">=3.9"
+dependencies = [
+    "flask>=2.0.0",
+    "flask-socketio>=5.0.0",
+    "python-socketio>=5.0.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["protocol*", "services*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

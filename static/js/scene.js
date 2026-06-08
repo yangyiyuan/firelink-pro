@@ -1,11 +1,7 @@
 // 信号模板模块
 const SceneModule = (function() {
-    // 模板分组定义（按协议类型标志分组）
-    const templateGroups = [
-        { id: 'facility', label: '消防设施状态', subtitle: 'TF 1~8', icon: `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z"/></svg>`, color: 'text-red-500' },
-        { id: 'device', label: '传输装置状态', subtitle: 'TF 21~28', icon: `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>`, color: 'text-blue-500' },
-        { id: 'tool', label: '快捷工具', icon: `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>`, color: 'text-violet-500' },
-    ];
+    // 模板分组定义（从 SceneDataModule 统一来源）
+    const templateGroups = SceneDataModule.TEMPLATE_GROUPS;
 
     const templates = [
         // ── 消防设施状态组 (TF 1~8) ──
@@ -239,7 +235,7 @@ const SceneModule = (function() {
             return;
         }
 
-        const groupMap = { facility: '消防设施', device: '传输装置', tool: '快捷工具' };
+        const groupMap = SceneDataModule.GROUP_MAP;
 
         list.innerHTML = filtered.map((inst, idx) => {
             const tpl = templates.find(t => t.id === inst.templateId);
@@ -251,7 +247,7 @@ const SceneModule = (function() {
             }).join('');
             return `
                 <div class="scene-card group relative flex items-start gap-2.5 p-2.5 rounded-lg cursor-pointer transition-all duration-200 mb-1.5 ${isActive ? 'scene-card-active ring-1 ring-emerald-400/30 bg-emerald-50' : 'bg-white border border-jd-cardBorder hover:border-emerald-200 hover:shadow-sm'}"
-                    onclick="SceneModule.selectSidebarInstance('${esc(inst.id)}')"
+                    onclick="SceneModule.selectSidebarInstance('${AduCommon.escapeAttr(inst.id)}')"
                     style="animation: fadeInUp 0.3s ease-out ${idx * 0.04}s both"
                 >
                     <div class="w-8 h-8 rounded-lg ${isActive ? 'bg-emerald-100 text-emerald-600' : 'bg-emerald-50 text-emerald-500'} flex items-center justify-center shrink-0">

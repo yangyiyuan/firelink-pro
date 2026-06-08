@@ -7,82 +7,51 @@ GBT 26875.3-2011 消防报警数据模拟器 - Web可视化版本
 
 import datetime
 import json
+import logging
 import os
 import socket
 import threading
 import time
-import traceback
 from collections import deque
 from typing import Any
 from urllib.parse import quote
 
+logger = logging.getLogger(__name__)
+
 from flask import Flask, jsonify, render_template, request
 from flask_socketio import SocketIO, emit
 
-try:
-    from fire_alarm_simulator.protocol.core import (
-        SCENE_CATALOG,
-        FireAlarmSimulator,
-        build_packet_view,
-        sequence_manager,
-    )
-    from fire_alarm_simulator.protocol.shared import (
-        AVAILABLE_PROFILES,
-        get_addr_byte_order_for_profile,
-        get_component_addr_byte_order_for_profile,
-    )
-    from fire_alarm_simulator.services.auto_send_scene import (
-        build_scene_plan,
-        delete_template as delete_auto_scene_template,
-        get_auto_send_meta,
-        list_templates as list_auto_send_templates,
-        rebuild_step_packet,
-        save_template as save_auto_scene_template,
-    )
-    from fire_alarm_simulator.services.signal_instance import (
-        create_instance,
-        delete_instance,
-        get_instance,
-        list_instances as list_signal_instances,
-        preview_instance,
-        resolve_instance_packet,
-        touch_instance,
-        update_instance,
-    )
-    from fire_alarm_simulator.services.common import now_ms_str as now_ms
-    from fire_alarm_simulator.services.network_config import NetworkConfigStore
-except ModuleNotFoundError:
-    from protocol.core import (
-        SCENE_CATALOG,
-        FireAlarmSimulator,
-        build_packet_view,
-        sequence_manager,
-    )
-    from protocol.shared import (
-        AVAILABLE_PROFILES,
-        get_addr_byte_order_for_profile,
-        get_component_addr_byte_order_for_profile,
-    )
-    from services.auto_send_scene import (
-        build_scene_plan,
-        delete_template as delete_auto_scene_template,
-        get_auto_send_meta,
-        list_templates as list_auto_send_templates,
-        rebuild_step_packet,
-        save_template as save_auto_scene_template,
-    )
-    from services.signal_instance import (
-        create_instance,
-        delete_instance,
-        get_instance,
-        list_instances as list_signal_instances,
-        preview_instance,
-        resolve_instance_packet,
-        touch_instance,
-        update_instance,
-    )
-    from services.common import now_ms_str as now_ms
-    from services.network_config import NetworkConfigStore
+from protocol.core import (
+    SCENE_CATALOG,
+    FireAlarmSimulator,
+    build_packet_view,
+    sequence_manager,
+)
+from protocol.shared import (
+    AVAILABLE_PROFILES,
+    get_addr_byte_order_for_profile,
+    get_component_addr_byte_order_for_profile,
+)
+from services.auto_send_scene import (
+    build_scene_plan,
+    delete_template as delete_auto_scene_template,
+    get_auto_send_meta,
+    list_templates as list_auto_send_templates,
+    rebuild_step_packet,
+    save_template as save_auto_scene_template,
+)
+from services.signal_instance import (
+    create_instance,
+    delete_instance,
+    get_instance,
+    list_instances as list_signal_instances,
+    preview_instance,
+    resolve_instance_packet,
+    touch_instance,
+    update_instance,
+)
+from services.utils import now_ms_str as now_ms
+from services.network_config import NetworkConfigStore
 
 
 def is_reloader_process() -> bool:
@@ -179,19 +148,23 @@ def new_run_id() -> str:
 
 
 def send_packet_network(packet: bytes, host: str, port: int, protocol: str, extra_fields: dict[str, Any] | None = None) -> dict[str, Any]:
-    print(f'[DEBUG] send_packet_network => host={host}, port={port}, protocol={protocol}, packet_len={len(packet)}')
+    logger.debug('send_packet_network => host=%s, port=%s, protocol=%s, packet_len=%d', host, port, protocol, len(packet))
     try:
         if protocol == 'tcp':
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(5)
-            sock.connect((host, int(port)))
-            sock.sendall(packet)
-            sock.close()
+            try:
+                sock.connect((host, int(port)))
+                sock.sendall(packet)
+            finally:
+                sock.close()
         else:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sock.settimeout(5)
-            sock.sendto(packet, (host, int(port)))
-            sock.close()
+            try:
+                sock.sendto(packet, (host, int(port)))
+            finally:
+                sock.close()
 
         simulator.stats['total_sent'] += 1
         result = {
@@ -206,7 +179,7 @@ def send_packet_network(packet: bytes, host: str, port: int, protocol: str, extr
         if extra_fields:
             result.update(extra_fields)
         record_send_history(result)
-        print(f'[DEBUG] send_packet_network OK => length={len(packet)}, hex_preview={packet.hex()[:40]}...')
+        logger.debug('send_packet_network OK => length=%d, hex_preview=%s...', len(packet), packet.hex()[:40])
         return result
     except Exception as exc:
         error_result = {
@@ -222,7 +195,7 @@ def send_packet_network(packet: bytes, host: str, port: int, protocol: str, extr
         if extra_fields:
             error_result.update(extra_fields)
         record_send_history(error_result)
-        print(f'[DEBUG] send_packet_network FAIL => error={exc}')
+        logger.debug('send_packet_network FAIL => error=%s', exc)
         return error_result
 
 
@@ -303,7 +276,7 @@ def _recv_loop(sock: socket.socket, host: str, port: int, protocol: str = 'tcp')
                         },
                     )
                 except Exception as exc:
-                    print(f'[接收] 协议解析失败: {exc}')
+                    logger.warning('协议解析失败: %s', exc)
         except OSError:
             break
         except Exception as exc:
@@ -324,10 +297,10 @@ def _recv_loop(sock: socket.socket, host: str, port: int, protocol: str = 'tcp')
                 stop_events.append(run_info['stop_event'])
     for ev in stop_events:
         ev.set()
-    print('[DEBUG] 连接断开，已联动停止自动场景')
+    logger.info('连接断开，已联动停止自动场景')
 
     socketio.emit('target_disconnected', {})
-    print(f'[DEBUG] _recv_loop 退出 => {host}:{port} 连接已断开')
+    logger.debug('_recv_loop 退出 => %s:%s 连接已断开', host, port)
 
 
 @socketio.on('connect')
@@ -436,7 +409,7 @@ def _start_single_scene(scene: dict, network: dict) -> None:
     port = network.get('port', 8080)
     protocol = network.get('protocol', 'tcp')
     template_id = scene.get('id', '')
-    print(f'[DEBUG] start_auto_scene => scene_name={scene.get("name")}, network={host}:{port}/{protocol}, steps={len(scene.get("steps", []))}')
+    logger.debug('start_auto_scene => scene_name=%s, network=%s:%s/%s, steps=%d', scene.get('name'), host, port, protocol, len(scene.get('steps', [])))
 
     with auto_scene_lock:
         for rid, rinfo in auto_scene_runs.items():
@@ -467,7 +440,7 @@ def _start_single_scene(scene: dict, network: dict) -> None:
         try:
             while not stop_event.is_set():
                 cycle_index += 1
-                print(f'[DEBUG] run_auto_scene => cycle={cycle_index}, steps={len(plan["steps"])}, stop={stop_event.is_set()}')
+                logger.debug('run_auto_scene => cycle=%d, steps=%d, stop=%s', cycle_index, len(plan["steps"]), stop_event.is_set())
                 for step_index, step in enumerate(plan['steps'], start=1):
                     if stop_event.is_set():
                         break
@@ -486,7 +459,7 @@ def _start_single_scene(scene: dict, network: dict) -> None:
                         and conn.get('host') == host
                         and conn.get('port') == target_port
                     )
-                    print(f'[DEBUG] run_auto_scene step={step_index} => use_connection={use_connection}, conn_host={conn.get("host") if conn else None}, conn_port={conn.get("port") if conn else None}, target_host={host}, target_port={target_port}')
+                    logger.debug('run_auto_scene step=%d => use_connection=%s, conn_host=%s, conn_port=%s, target_host=%s, target_port=%s', step_index, use_connection, conn.get("host") if conn else None, conn.get("port") if conn else None, host, target_port)
 
                     if use_connection:
                         try:
@@ -519,8 +492,7 @@ def _start_single_scene(scene: dict, network: dict) -> None:
                             }
                             record_send_history(result)
                         except Exception as exc:
-                            print(f'[DEBUG] 长连接发送失败 => {exc}')
-                            traceback.print_exc()
+                            logger.warning('长连接发送失败 => %s', exc, exc_info=True)
                             result = {
                                 'success': False,
                                 'error': str(exc),
@@ -589,7 +561,7 @@ def _start_single_scene(scene: dict, network: dict) -> None:
                             'template_id': template_id,
                         },
                     )
-                    print(f'[DEBUG] auto_scene_step_result => step={step_index}/{len(plan["steps"])}, cycle={cycle_index}, success={result.get("success")}, hex_len={result.get("length")}, via={"长连接" if result.get("via_connection") else "短连接"}')
+                    logger.debug('auto_scene_step_result => step=%d/%d, cycle=%d, success=%s, hex_len=%s, via=%s', step_index, len(plan["steps"]), cycle_index, result.get("success"), result.get("length"), "长连接" if result.get("via_connection") else "短连接")
                     if step['delay_after_sec'] > 0:
                         if stop_event.wait(step['delay_after_sec']):
                             break
@@ -607,8 +579,7 @@ def _start_single_scene(scene: dict, network: dict) -> None:
                 if stop_event.is_set() or not plan['loop']:
                     break
         except Exception as exc:
-            print(f'[DEBUG] run_auto_scene CRASHED => {exc}')
-            traceback.print_exc()
+            logger.error('run_auto_scene CRASHED => %s', exc, exc_info=True)
             socketio.emit('auto_scene_error', {'message': str(exc), 'run_id': run_id, 'template_id': template_id})
         finally:
             with auto_scene_lock:
@@ -629,7 +600,7 @@ def _start_single_scene(scene: dict, network: dict) -> None:
             'template_id': template_id,
         },
     )
-    print(f'[DEBUG] auto_scene_started => run_id={run_id}, scene_name={plan["scene_name"]}, steps={len(plan["steps"])}, loop={plan["loop"]}')
+    logger.debug('auto_scene_started => run_id=%s, scene_name=%s, steps=%d, loop=%s', run_id, plan["scene_name"], len(plan["steps"]), plan["loop"])
 
 
 @socketio.on('stop_auto_scene')
@@ -668,7 +639,7 @@ def handle_connect_target(data: dict[str, Any]) -> None:
     host = data.get('host', '127.0.0.1')
     port = int(data.get('port', 8080))
     protocol = data.get('protocol', 'tcp')
-    print(f'[DEBUG] connect_target => host={host}, port={port}, protocol={protocol}')
+    logger.debug('connect_target => host=%s, port=%d, protocol=%s', host, port, protocol)
 
     try:
         with target_lock:
@@ -703,12 +674,12 @@ def handle_connect_target(data: dict[str, Any]) -> None:
             }
 
         emit('target_connected', {'host': host, 'port': port, 'protocol': protocol})
-        print(f'[DEBUG] target_connected => host={host}, port={port}, protocol={protocol}')
+        logger.info('target_connected => host=%s, port=%s, protocol=%s', host, port, protocol)
     except Exception as exc:
         with target_lock:
             target_connection = None
         emit('target_connection_error', {'error': str(exc)})
-        print(f'[DEBUG] target_connection_error => {exc}')
+        logger.error('target_connection_error => %s', exc)
 
 
 @socketio.on('disconnect_target')
@@ -818,8 +789,10 @@ def test_connection():
         if protocol == 'tcp':
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(5)
-            sock.connect((host, port))
-            sock.close()
+            try:
+                sock.connect((host, port))
+            finally:
+                sock.close()
         else:
             socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_DGRAM)
         return jsonify({'success': True, 'host': host, 'port': port, 'protocol': protocol})
@@ -1089,7 +1062,7 @@ def get_stats():
         'history_count': history_count,
         'sequence': sequence_manager.current(),
     }
-    print(f'[DEBUG] /api/stats => {json.dumps(result, ensure_ascii=False)}')
+    logger.debug('/api/stats => %s', json.dumps(result, ensure_ascii=False))
     return jsonify(result)
 
 
@@ -1119,8 +1092,8 @@ def reset_sequence():
 def get_history():
     limit = request.args.get('limit', 50, type=int)
     with send_history_lock:
-        result = list(send_history[-limit:])
-    print(f'[DEBUG] /api/history (limit={limit}) => {len(result)} 条记录')
+        result = list(send_history)[-limit:]
+    logger.debug('/api/history (limit=%d) => %d 条记录', limit, len(result))
     return jsonify(result)
 
 
@@ -1447,13 +1420,17 @@ def set_current_profile():
 
 if __name__ == '__main__':
     debug_mode = os.environ.get('FLASK_DEBUG', 'true').lower() in ('true', '1', 'yes')
+    logging.basicConfig(
+        level=logging.DEBUG if debug_mode else logging.INFO,
+        format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    )
     if is_main_process():
-        print('=' * 60)
-        print('GBT 26875.3-2011 消防报警数据模拟器')
-        print('=' * 60)
-        print('访问地址: http://127.0.0.1:5001')
-        print(f"热重载模式: {'开启' if debug_mode else '关闭'}")
+        logger.info('=' * 60)
+        logger.info('GBT 26875.3-2011 消防报警数据模拟器')
+        logger.info('=' * 60)
+        logger.info('访问地址: http://127.0.0.1:5001')
+        logger.info('热重载模式: %s', '开启' if debug_mode else '关闭')
         if debug_mode:
-            print('提示: 修改 app.py 或 templates/*.html 后服务将自动重启')
-        print('=' * 60)
+            logger.info('提示: 修改 app.py 或 templates/*.html 后服务将自动重启')
+        logger.info('=' * 60)
     socketio.run(app, host='0.0.0.0', port=5001, debug=debug_mode, use_reloader=debug_mode, allow_unsafe_werkzeug=True)

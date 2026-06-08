@@ -1,10 +1,5 @@
-import copy
 import datetime
 from typing import Any, Optional
-
-
-def deep_copy(value: Any) -> Any:
-    return copy.deepcopy(value)
 
 
 def parse_int(value: Any, default: Optional[int] = None) -> int:

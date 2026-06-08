@@ -20,7 +20,7 @@ const AutoSendModule = (function() {
     let categoryOptions = [
         { value: 'fire', label: '火警报警', desc: '类型标志2·部件状态火警' },
         { value: 'fault', label: '故障报警', desc: '类型标志2·部件状态故障' },
-        { value: 'restore', label: '状态恢复', desc: '类型标志135·部件状态恢复' },
+        { value: 'restore', label: '状态恢复', desc: '类型标志2·部件状态恢复' },
         { value: 'linkage', label: '联动控制', desc: '类型标志2·启动/反馈' },
         { value: 'supervise', label: '监管报警', desc: '类型标志2·部件状态监管' },
         { value: 'analog', label: '模拟量监控', desc: '类型标志3·温度/烟雾/压力' },
@@ -34,7 +34,7 @@ const AutoSendModule = (function() {
     let categoryDefaults = {
         'fire':     { typeFlag: 2, command: 2, objectType: 'component_status' },
         'fault':    { typeFlag: 2, command: 2, objectType: 'component_status' },
-        'restore':  { typeFlag: 135, command: 2, objectType: 'component_status' },
+        'restore':  { typeFlag: 2, command: 2, objectType: 'component_status' },
         'linkage':  { typeFlag: 2, command: 2, objectType: 'component_status' },
         'supervise': { typeFlag: 2, command: 2, objectType: 'component_status' },
         'analog':   { typeFlag: 3, command: 2, objectType: 'analog_value' },
@@ -387,7 +387,7 @@ const AutoSendModule = (function() {
                 ? 'bg-jd-primaryLight text-jd-primary'
                 : 'bg-emerald-50 text-emerald-700';
             return `
-                <button type="button" class="auto-template-item w-full text-left rounded-xl border px-3 py-3 transition-colors ${active ? 'border-jd-primary bg-jd-primaryLight/40' : 'border-jd-cardBorder bg-white hover:border-jd-primaryBorder'}" onclick="AutoSendModule.selectTemplate('${template.id}')">
+                <button type="button" class="auto-template-item w-full text-left rounded-xl border px-3 py-3 transition-colors ${active ? 'border-jd-primary bg-jd-primaryLight/40' : 'border-jd-cardBorder bg-white hover:border-jd-primaryBorder'}" onclick="AutoSendModule.selectTemplate('${escapeAttr(template.id)}')">
                     <div class="flex items-start justify-between gap-2">
                         <div class="min-w-0">
                             <div class="text-sm font-medium ${active ? 'text-jd-primary' : 'text-jd-text'} truncate">${escapeHtml(template.name || '未命名模板')}</div>
@@ -494,7 +494,7 @@ const AutoSendModule = (function() {
                     <div class="grid grid-cols-4 gap-3">
                         <div>
                             <label class="block text-xs text-jd-textSecondary mb-1.5">步骤名称</label>
-                            <input type="text" class="jd-input w-full px-3 py-2 rounded-lg text-sm ${disBg}" value="${escapeHtml(step.name || '')}"${dis} oninput="AutoSendModule.updateStepField(${stepIndex}, 'name', this.value)">
+                            <input type="text" class="jd-input w-full px-3 py-2 rounded-lg text-sm ${disBg}" value="${escapeAttr(step.name || '')}"${dis} oninput="AutoSendModule.updateStepField(${stepIndex}, 'name', this.value)">
                         </div>
                         <div>
                             <label class="block text-xs text-jd-textSecondary mb-1.5 flex items-center gap-1">等待秒数<span class="relative group cursor-help"><svg class="w-3 h-3 text-jd-textMuted" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg><span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1.5 rounded-lg bg-slate-700 text-white text-[11px] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">0 表示不等待，立即执行下一步</span></span></label>
@@ -502,11 +502,11 @@ const AutoSendModule = (function() {
                         </div>
                         <div>
                             <label class="block text-xs text-jd-textSecondary mb-1.5">源地址</label>
-                            <input type="text" class="jd-input w-full px-3 py-2 rounded-lg text-sm ${disBg}" value="${escapeHtml(step.packetHeader.sourceAddr || '')}"${dis} oninput="AutoSendModule.updateStepField(${stepIndex}, 'sourceAddr', this.value)">
+                            <input type="text" class="jd-input w-full px-3 py-2 rounded-lg text-sm ${disBg}" value="${escapeAttr(step.packetHeader.sourceAddr || '')}"${dis} oninput="AutoSendModule.updateStepField(${stepIndex}, 'sourceAddr', this.value)">
                         </div>
                         <div>
                             <label class="block text-xs text-jd-textSecondary mb-1.5">目的地址</label>
-                            <input type="text" class="jd-input w-full px-3 py-2 rounded-lg text-sm ${disBg}" value="${escapeHtml(step.packetHeader.destAddr || '')}"${dis} oninput="AutoSendModule.updateStepField(${stepIndex}, 'destAddr', this.value)">
+                            <input type="text" class="jd-input w-full px-3 py-2 rounded-lg text-sm ${disBg}" value="${escapeAttr(step.packetHeader.destAddr || '')}"${dis} oninput="AutoSendModule.updateStepField(${stepIndex}, 'destAddr', this.value)">
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
@@ -544,7 +544,7 @@ const AutoSendModule = (function() {
             </div>
             <div>
                 <label class="block text-xs text-jd-textSecondary mb-1.5">固定时间</label>
-                <input type="text" id="fp-${stepIndex}" class="jd-input fp-datetime w-full px-3 py-2 rounded-lg text-sm ${disBg}" placeholder="点击选择日期时间" data-value="${escapeHtml(fields.occurredAt || '')}" ${fields.occurredAtMode === 'fixed' ? '' : 'disabled'}${dis}>
+                <input type="text" id="fp-${stepIndex}" class="jd-input fp-datetime w-full px-3 py-2 rounded-lg text-sm ${disBg}" placeholder="点击选择日期时间" data-value="${escapeAttr(fields.occurredAt || '')}" ${fields.occurredAtMode === 'fixed' ? '' : 'disabled'}${dis}>
             </div>
         `;
 
@@ -593,7 +593,7 @@ const AutoSendModule = (function() {
                 ${renderPresetSelect('部件状态', 'component_status', fields.componentStatus, stepIndex, 'componentStatus')}
                 <div>
                     <label class="block text-xs text-jd-textSecondary mb-1.5">描述</label>
-                    <input type="text" class="jd-input w-full px-3 py-2 rounded-lg text-sm ${disBg}" value="${escapeHtml(fields.description || '')}"${dis} oninput="AutoSendModule.updateObjectField(${stepIndex}, 'description', this.value)">
+                    <input type="text" class="jd-input w-full px-3 py-2 rounded-lg text-sm ${disBg}" value="${escapeAttr(fields.description || '')}"${dis} oninput="AutoSendModule.updateObjectField(${stepIndex}, 'description', this.value)">
                 </div>
                 ${commonTimeFields}
             </div>
@@ -765,7 +765,7 @@ const AutoSendModule = (function() {
                 ` : ''}
                 <div>
                     <div class="text-[11px] text-jd-textMuted mb-1.5">HEX 预览</div>
-                    <div class="raw-hex-box hex-display">${SceneModule.formatHex(step.packetHex)}</div>
+                    <div class="raw-hex-box hex-display">${AduCommon.formatHex(step.packetHex)}</div>
                 </div>
             </section>
         `;
@@ -1150,6 +1150,10 @@ const AutoSendModule = (function() {
 
     function escapeHtml(value) {
         return AduCommon.escapeHtml(value);
+    }
+
+    function escapeAttr(value) {
+        return AduCommon.escapeAttr(value);
     }
 
     function isRunning() {

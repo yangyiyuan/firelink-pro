@@ -138,9 +138,16 @@ const AduCommon = (function() {
         return String(value ?? '')
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
+            .replace(/>/g, '&gt;');
+    }
+
+    function escapeAttr(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
             .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
+            .replace(/'/g, '&#39;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
     }
 
     function formatHexInteractive(hex) {
@@ -382,6 +389,7 @@ const AduCommon = (function() {
         ADU_HEADER_LAYOUT,
         ADU_BYTE_LAYOUTS,
         escapeHtml,
+        escapeAttr,
         formatHexInteractive,
         formatHex,
         getByteRangeForHeaderField,
