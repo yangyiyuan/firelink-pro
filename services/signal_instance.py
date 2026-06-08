@@ -4,12 +4,10 @@ import os
 import uuid
 from typing import Any, Dict, List, Optional
 
-from protocol.core import (
-    SCENE_CATALOG,
-    FireAlarmSimulator,
-    GBT26875Packet,
-    build_packet_view,
-)
+from protocol.scene_catalog import SCENE_CATALOG
+from protocol.simulator import FireAlarmSimulator
+from protocol.core import GBT26875Packet
+from protocol.packet_view import build_packet_view
 from services.utils import now_str, parse_int
 
 

@@ -5,7 +5,8 @@ import os
 import uuid
 from typing import Any, Dict, List
 
-from protocol.core import ADUBuilder, GBT26875Packet, build_packet_view
+from protocol.core import ADUBuilder, GBT26875Packet
+from protocol.packet_view import build_packet_view
 from protocol.shared import (
     COMMAND_CN,
     TYPE_FLAG_CN,
@@ -79,6 +80,8 @@ DEVICE_STATUS_PRESETS = [
 
 SERVICE_DIR = os.path.dirname(os.path.dirname(__file__))
 TEMPLATE_FILE = os.path.join(SERVICE_DIR, 'auto_send_templates.json')
+SYSTEM_TEMPLATE_FILE = os.path.join(SERVICE_DIR, 'data', 'system_templates.json')
+_system_template_cache: List[Dict[str, Any]] | None = None
 
 
 def _field_error(step_index: int, field_path: str, message: str) -> ValueError:
@@ -191,7 +194,27 @@ def _create_step(name: str, type_flag: int, obj: Dict[str, Any], delay_after_sec
 
 
 def _system_templates() -> List[Dict[str, Any]]:
-    templates = [
+    global _system_template_cache
+    if _system_template_cache is not None:
+        return _system_template_cache
+
+    if os.path.exists(SYSTEM_TEMPLATE_FILE):
+        try:
+            with open(SYSTEM_TEMPLATE_FILE, 'r', encoding='utf-8') as fh:
+                data = json.load(fh)
+            templates = data.get('templates', [])
+            templates = [_migrate_template(t) for t in templates]
+            _system_template_cache = templates
+            return templates
+        except Exception:
+            pass
+
+    _system_template_cache = _builtin_default_templates()
+    return _system_template_cache
+
+
+def _builtin_default_templates() -> List[Dict[str, Any]]:
+    return [
         {
             'id': 'system_dual_fire',
             'name': '两点报警',
@@ -238,141 +261,7 @@ def _system_templates() -> List[Dict[str, Any]]:
                 ),
             ],
         },
-        {
-            'id': 'system_fire_feedback',
-            'name': '报警-反馈',
-            'category': 'linkage',
-            'description': '烟感火警后联动模块反馈，验证报警联动响应',
-            'source': 'system',
-            'version': 2,
-            'loop': True,
-            'steps': [
-                _create_step(
-                    '烟感火警',
-                    2,
-                    _create_object('component_status', {'componentType': 42, 'componentStatus': 2, 'description': 'A区1层大厅烟感01'}),
-                    delay_after_sec=3,
-                ),
-                _create_step(
-                    '联动反馈',
-                    2,
-                    _create_object('component_status', {'componentType': 86, 'componentStatus': 64, 'description': '联动模块反馈'}),
-                    delay_after_sec=5,
-                ),
-            ],
-        },
-        {
-            'id': 'system_start_feedback',
-            'name': '启动-反馈',
-            'category': 'linkage',
-            'description': '联动启动信号后接收反馈，验证控制输出闭环',
-            'source': 'system',
-            'version': 2,
-            'loop': True,
-            'steps': [
-                _create_step(
-                    '联动启动',
-                    2,
-                    _create_object('component_status', {'componentType': 86, 'componentStatus': 32, 'description': '联动模块启动'}),
-                    delay_after_sec=3,
-                ),
-                _create_step(
-                    '联动反馈',
-                    2,
-                    _create_object('component_status', {'componentType': 86, 'componentStatus': 64, 'description': '联动模块反馈'}),
-                    delay_after_sec=5,
-                ),
-            ],
-        },
-        {
-            'id': 'system_fire_feedback_recovery',
-            'name': '报警-反馈-恢复',
-            'category': 'restore',
-            'description': '火警后联动反馈，再上报恢复，完整演示报警处置流程',
-            'source': 'system',
-            'version': 2,
-            'loop': True,
-            'steps': [
-                _create_step(
-                    '烟感火警',
-                    2,
-                    _create_object('component_status', {'componentType': 42, 'componentStatus': 2, 'description': 'A区1层大厅烟感01'}),
-                    delay_after_sec=3,
-                ),
-                _create_step(
-                    '联动反馈',
-                    2,
-                    _create_object('component_status', {'componentType': 86, 'componentStatus': 64, 'description': '联动模块反馈'}),
-                    delay_after_sec=5,
-                ),
-                _create_step(
-                    '烟感恢复',
-                    2,
-                    _create_object('component_status', {'componentType': 42, 'componentStatus': 0, 'description': 'A区1层大厅烟感01恢复'}),
-                    delay_after_sec=5,
-                ),
-            ],
-        },
-        {
-            'id': 'system_supervise_restore',
-            'name': '监管-恢复',
-            'category': 'supervise',
-            'description': '部件监管报警后延时恢复，验证监管事件处理流程',
-            'source': 'system',
-            'version': 2,
-            'loop': True,
-            'steps': [
-                _create_step(
-                    '部件监管',
-                    2,
-                    _create_object('component_status', {'componentType': 42, 'componentStatus': 16, 'description': 'A区1层烟感监管'}),
-                    delay_after_sec=5,
-                ),
-                _create_step(
-                    '部件恢复',
-                    2,
-                    _create_object('component_status', {'componentType': 42, 'componentStatus': 0, 'description': 'A区1层烟感恢复'}),
-                    delay_after_sec=5,
-                ),
-            ],
-        },
-        {
-            'id': 'system_full_linkage',
-            'name': '完整联动链路',
-            'category': 'sequence',
-            'description': '两点确认火警→联动反馈→烟感恢复，演示最完整的报警处置链路',
-            'source': 'system',
-            'version': 2,
-            'loop': False,
-            'steps': [
-                _create_step(
-                    '烟感火警',
-                    2,
-                    _create_object('component_status', {'componentType': 42, 'componentStatus': 2, 'bitNo': 1001, 'zoneNo': 1, 'description': 'A区1层大厅烟感01'}),
-                    delay_after_sec=5,
-                ),
-                _create_step(
-                    '手报火警',
-                    2,
-                    _create_object('component_status', {'componentType': 23, 'componentStatus': 2, 'bitNo': 1002, 'zoneNo': 1, 'description': 'A区1层大厅手报02'}),
-                    delay_after_sec=5,
-                ),
-                _create_step(
-                    '联动反馈',
-                    2,
-                    _create_object('component_status', {'componentType': 86, 'componentStatus': 64, 'description': '联动模块反馈'}),
-                    delay_after_sec=5,
-                ),
-                _create_step(
-                    '烟感恢复',
-                    2,
-                    _create_object('component_status', {'componentType': 42, 'componentStatus': 0, 'description': 'A区1层大厅烟感01恢复'}),
-                    delay_after_sec=5,
-                ),
-            ],
-        },
     ]
-    return templates
 
 
 def _default_scene() -> Dict[str, Any]:
