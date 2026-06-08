@@ -16,6 +16,7 @@ from services.auto_send_scene import (
     list_templates as list_auto_send_templates,
     save_template as save_auto_scene_template,
 )
+from services.api.response_utils import success_response, error_response
 
 
 def create_auto_send_bp(profile_state):
@@ -40,7 +41,7 @@ def create_auto_send_bp(profile_state):
         data = request.get_json()
         hex_str = data.get('hex', '').strip()
         if not hex_str:
-            return jsonify({'success': False, 'error': 'HEX数据不能为空'})
+            return error_response('HEX数据不能为空')
         try:
             packet = bytes.fromhex(hex_str.replace(' ', ''))
             parsed = build_packet_view(
@@ -49,9 +50,9 @@ def create_auto_send_bp(profile_state):
                 component_addr_byteorder=_component_addr_byte_order(),
             )
             parsed['raw_hex'] = hex_str.replace(' ', '')
-            return jsonify({'success': True, 'parsed': parsed})
+            return success_response({'parsed': parsed})
         except Exception as exc:
-            return jsonify({'success': False, 'error': str(exc)})
+            return error_response(str(exc))
 
     @bp.route('/auto_send/meta')
     def get_auto_send_scene_meta():
@@ -67,9 +68,9 @@ def create_auto_send_bp(profile_state):
         scene = data.get('scene') or data
         try:
             template = save_auto_scene_template(scene)
-            return jsonify(template), 201
+            return success_response(template, status_code=201)
         except Exception as exc:
-            return jsonify({'error': str(exc)}), 400
+            return error_response(str(exc))
 
     @bp.route('/auto_send/templates/<template_id>', methods=['PUT'])
     def update_auto_send_template(template_id):
@@ -79,13 +80,13 @@ def create_auto_send_bp(profile_state):
             template = save_auto_scene_template(scene, template_id=template_id)
             return jsonify(template)
         except Exception as exc:
-            return jsonify({'error': str(exc)}), 400
+            return error_response(str(exc))
 
     @bp.route('/auto_send/templates/<template_id>', methods=['DELETE'])
     def remove_auto_send_template(template_id):
         if delete_auto_scene_template(template_id):
-            return jsonify({'success': True})
-        return jsonify({'error': '模板不存在或不可删除'}), 404
+            return success_response()
+        return error_response('模板不存在或不可删除', status_code=404)
 
     @bp.route('/auto_send/preview', methods=['POST'])
     def preview_auto_send_scene():
@@ -111,15 +112,12 @@ def create_auto_send_bp(profile_state):
                 }
                 for step in plan['steps']
             ]
-            return jsonify(
-                {
-                    'success': True,
-                    'sceneName': plan['scene_name'],
-                    'loop': plan['loop'],
-                    'steps': steps,
-                }
+            return success_response(
+                sceneName=plan['scene_name'],
+                loop=plan['loop'],
+                steps=steps,
             )
         except Exception as exc:
-            return jsonify({'success': False, 'error': str(exc)}), 400
+            return error_response(str(exc))
 
     return bp

@@ -4,6 +4,8 @@
 
 from flask import Blueprint, jsonify, request
 
+from services.api.response_utils import error_response
+
 
 def create_connection_bp(connection_mgr):
     """Create and return the connection Blueprint.
@@ -25,8 +27,8 @@ def create_connection_bp(connection_mgr):
         port = data.get('port', 8080)
         protocol = data.get('protocol', 'tcp')
         result = connection_mgr.test_connection(host, port, protocol)
-        if not result.get('success') and (result.get('error') == '主机地址不能为空' or result.get('error') == '端口号无效'):
-            return jsonify(result), 400
+        if not result.get('success') and result.get('error') in ('主机地址不能为空', '端口号无效'):
+            return error_response(result['error'])
         return jsonify(result)
 
     return bp

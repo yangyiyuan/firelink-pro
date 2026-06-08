@@ -10,6 +10,7 @@ from protocol.shared import (
     get_addr_byte_order_for_profile,
     get_component_addr_byte_order_for_profile,
 )
+from services.api.response_utils import error_response
 
 
 def create_profiles_bp(profile_state, simulator, socketio):
@@ -53,7 +54,7 @@ def create_profiles_bp(profile_state, simulator, socketio):
         key = data.get('key', '')
         valid_keys = [p['key'] for p in AVAILABLE_PROFILES]
         if key not in valid_keys:
-            return jsonify({'error': f'无效的 profile key: {key}'}), 400
+            return error_response(f'无效的 profile key: {key}')
 
         # Mutate the shared profile_state dict in-place so app.py
         # (and the addr_byte_order closures) pick up the new value.

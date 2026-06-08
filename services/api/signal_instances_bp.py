@@ -9,6 +9,7 @@ from protocol.shared import (
     get_addr_byte_order_for_profile,
     get_component_addr_byte_order_for_profile,
 )
+from services.api.response_utils import success_response, error_response
 from services.signal_instance import (
     create_instance,
     delete_instance,
@@ -47,17 +48,17 @@ def create_signal_instances_bp(profile_state):
         data = request.get_json() or {}
         try:
             instance = create_instance(data)
-            return jsonify(instance), 201
+            return success_response(instance, status_code=201)
         except ValueError as exc:
-            return jsonify({'error': str(exc)}), 400
+            return error_response(str(exc))
         except Exception as exc:
-            return jsonify({'error': str(exc)}), 500
+            return error_response(str(exc), status_code=500)
 
     @bp.route('/signal_instances/<instance_id>', methods=['GET'])
     def get_signal_instance_detail(instance_id):
         instance = get_instance(instance_id)
         if instance is None:
-            return jsonify({'error': '实例不存在'}), 404
+            return error_response('实例不存在', status_code=404)
         return jsonify(instance)
 
     @bp.route('/signal_instances/<instance_id>', methods=['PUT'])
@@ -67,15 +68,15 @@ def create_signal_instances_bp(profile_state):
             instance = update_instance(instance_id, data)
             return jsonify(instance)
         except ValueError as exc:
-            return jsonify({'error': str(exc)}), 400
+            return error_response(str(exc))
         except Exception as exc:
-            return jsonify({'error': str(exc)}), 500
+            return error_response(str(exc), status_code=500)
 
     @bp.route('/signal_instances/<instance_id>', methods=['DELETE'])
     def delete_signal_instance(instance_id):
         if delete_instance(instance_id):
-            return jsonify({'success': True})
-        return jsonify({'error': '实例不存在'}), 404
+            return success_response()
+        return error_response('实例不存在', status_code=404)
 
     @bp.route('/signal_instances/<instance_id>/preview', methods=['POST'])
     def preview_signal_instance(instance_id):
@@ -87,15 +88,15 @@ def create_signal_instances_bp(profile_state):
             )
             return jsonify(result)
         except ValueError as exc:
-            return jsonify({'success': False, 'error': str(exc)}), 400
+            return error_response(str(exc))
         except Exception as exc:
-            return jsonify({'success': False, 'error': str(exc)}), 500
+            return error_response(str(exc), status_code=500)
 
     @bp.route('/signal_instances/<instance_id>/resolve', methods=['GET'])
     def resolve_signal_instance(instance_id):
         instance = get_instance(instance_id)
         if instance is None:
-            return jsonify({'error': '实例不存在'}), 404
+            return error_response('实例不存在', status_code=404)
         try:
             packet = resolve_instance_packet(
                 instance,
@@ -117,6 +118,6 @@ def create_signal_instances_bp(profile_state):
                 'packetView': packet_view,
             })
         except ValueError as exc:
-            return jsonify({'error': str(exc)}), 400
+            return error_response(str(exc))
 
     return bp

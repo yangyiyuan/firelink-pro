@@ -9,6 +9,7 @@ from flask import Blueprint, jsonify, request
 
 from protocol.scene_catalog import SCENE_CATALOG
 from protocol.sequence import sequence_manager
+from services.api.response_utils import success_response, error_response
 
 logger = logging.getLogger(__name__)
 
@@ -55,8 +56,8 @@ def create_scenes_bp(simulator, history_mgr):
         try:
             value = int(value)
         except (ValueError, TypeError):
-            return jsonify({'error': '无效的序号值'}), 400
+            return error_response('无效的序号值')
         sequence_manager.reset(value)
-        return jsonify({'success': True, 'current': sequence_manager.current()})
+        return success_response(current=sequence_manager.current())
 
     return bp

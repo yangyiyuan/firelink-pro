@@ -16,39 +16,18 @@ const AutoSendModule = (function() {
     }
 
 
-    // 默认分类（meta加载后由后端覆盖）
-    let categoryOptions = [
-        { value: 'fire', label: '火警报警', desc: '类型标志2·部件状态火警' },
-        { value: 'fault', label: '故障报警', desc: '类型标志2·部件状态故障' },
-        { value: 'restore', label: '状态恢复', desc: '类型标志2·部件状态恢复' },
-        { value: 'linkage', label: '联动控制', desc: '类型标志2·启动/反馈' },
-        { value: 'supervise', label: '监管报警', desc: '类型标志2·部件状态监管' },
-        { value: 'analog', label: '模拟量监控', desc: '类型标志3·温度/烟雾/压力' },
-        { value: 'device', label: '传输装置', desc: '类型标志21·装置运行状态' },
-        { value: 'shield', label: '屏蔽管理', desc: '类型标志2·部件状态屏蔽' },
-        { value: 'sequence', label: '序列编排', desc: '多步骤时序组合' },
-        { value: 'custom', label: '自定义', desc: '用户自定义编排' },
-    ];
-
-    // 分类→协议默认值映射（meta加载后由后端覆盖）
-    let categoryDefaults = {
-        'fire':     { typeFlag: 2, command: 2, objectType: 'component_status' },
-        'fault':    { typeFlag: 2, command: 2, objectType: 'component_status' },
-        'restore':  { typeFlag: 2, command: 2, objectType: 'component_status' },
-        'linkage':  { typeFlag: 2, command: 2, objectType: 'component_status' },
-        'supervise': { typeFlag: 2, command: 2, objectType: 'component_status' },
-        'analog':   { typeFlag: 3, command: 2, objectType: 'analog_value' },
-        'device':   { typeFlag: 21, command: 2, objectType: 'device_status' },
-        'shield':   { typeFlag: 2, command: 2, objectType: 'component_status' },
-    };
+    // 分类选项与默认值 — meta 加载后由后端填充
+    let categoryOptions = null;
+    let categoryDefaults = null;
 
     function getCategoryLabel(value) {
+        if (!categoryOptions) return value;
         return categoryOptions.find(item => item.value === value)?.label || value;
     }
 
     function syncCategorySelect() {
         const select = document.getElementById('autoSceneCategoryInput');
-        if (!select) return;
+        if (!select || !categoryOptions) return;
         const currentVal = select.value;
         select.innerHTML = categoryOptions.map(opt =>
             `<option value="${opt.value}">${opt.label}</option>`
@@ -75,7 +54,14 @@ const AutoSendModule = (function() {
         socket = socketInstance;
         setupSocketListeners();
         initMultiSelect();
-        loadInitialData();
+        renderLoadingState();
+        loadInitialData().then(() => {
+            if (!meta) {
+                renderErrorState('配置加载失败，请刷新页面重试');
+                return;
+            }
+            renderAll();
+        });
     }
 
     async function loadInitialData() {
@@ -98,10 +84,9 @@ const AutoSendModule = (function() {
             if (templates.length > 0 && selectedSceneIds.size === 0) {
                 selectedSceneIds.add(templates[0].id);
             }
-            renderAll();
         } catch (error) {
             console.error(error);
-            showToast('自动发送配置加载失败', 'error');
+            meta = null;
         }
     }
 
@@ -109,6 +94,29 @@ const AutoSendModule = (function() {
         renderAll();
     }
 
+    function renderLoadingState() {
+        const container = document.getElementById('autoTemplateList');
+        if (container) {
+            container.innerHTML = `
+                <div class="flex items-center justify-center h-32 text-gray-400">
+                    <svg class="animate-spin h-6 w-6 mr-2" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                    </svg>
+                    加载配置中...
+                </div>`;
+        }
+    }
+
+    function renderErrorState(message) {
+        const container = document.getElementById('autoTemplateList');
+        if (container) {
+            container.innerHTML = `
+                <div class="flex items-center justify-center h-32 text-red-400">
+                    <span class="text-sm">${AduCommon.escapeHtml(message)}</span>
+                </div>`;
+        }
+    }
 
 
     function createFallbackScene() {
@@ -169,7 +177,7 @@ const AutoSendModule = (function() {
     }
 
     function createStep(typeFlag = null) {
-        const defaults = categoryDefaults[currentScene?.category];
+        const defaults = categoryDefaults?.[currentScene?.category];
         const effectiveTypeFlag = typeFlag ?? (defaults?.typeFlag ?? 2);
         const effectiveCommand = defaults?.command ?? 2;
         const primaryObjectType = getAllowedObjectTypes(effectiveTypeFlag)[0] || 'component_status';
@@ -811,7 +819,7 @@ const AutoSendModule = (function() {
     /** 判断当前分类是否可自动推导命令字和类型标志 */
     function isAutoDerivedCategory() {
         const cat = currentScene?.category;
-        return cat && cat !== 'sequence' && cat !== 'custom' && categoryDefaults[cat];
+        return cat && cat !== 'sequence' && cat !== 'custom' && categoryDefaults?.[cat];
     }
 
     function updateSceneField(field, value) {
@@ -823,7 +831,7 @@ const AutoSendModule = (function() {
             renderTemplateList();
             return;
         }
-        if (field === 'category' && value !== 'sequence' && value !== 'custom' && categoryDefaults[value]) {
+        if (field === 'category' && value !== 'sequence' && value !== 'custom' && categoryDefaults?.[value]) {
             const defaults = categoryDefaults[value];
             currentScene.steps.forEach(step => {
                 step.packetHeader.typeFlag = defaults.typeFlag;
