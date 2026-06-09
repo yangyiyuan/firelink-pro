@@ -6,6 +6,19 @@ build-backend = "setuptools.build_meta"
 name = "fire-alarm-simulator"
 version = "1.0.0"
 description = "GBT 26875.3-2011 fire alarm data simulator"
+authors = [
+    {name = "杨依园", email = "654846126@qq.com"},
+]
+license = {text = "AGPL-3.0-or-later"}
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: System :: Networking",
+]
+keywords = ["fire-alarm", "iot", "gb26875", "simulator", "smart-fire"]
 requires-python = ">=3.9"
 dependencies = [
     "flask>=2.0.0",
