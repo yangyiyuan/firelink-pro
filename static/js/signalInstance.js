@@ -1,3 +1,5 @@
+// 信号实例模块
+// 依赖: socket(init传入), AduCommon(adu-common.js), SceneDataModule(sceneData.js), CustomSelect(customSelect.js)
 const SignalInstanceModule = (function() {
     let socket;
     let instances = [];

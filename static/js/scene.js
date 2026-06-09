@@ -1,4 +1,5 @@
 // 信号模板模块
+// 依赖: socket(init传入), SceneDataModule(sceneData.js), AduCommon(adu-common.js)
 const SceneModule = (function() {
     // 模板分组定义（从 SceneDataModule 统一来源）
     const templateGroups = SceneDataModule.TEMPLATE_GROUPS;

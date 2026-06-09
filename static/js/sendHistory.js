@@ -1,3 +1,4 @@
+// 发送历史模块（无外部依赖）
 const SendHistoryModule = (function() {
     let currentHistoryId = null;
     let currentRecords = [];

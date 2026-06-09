@@ -1,4 +1,4 @@
-// 工具函数模块
+// 工具函数模块（基础模块，无外部依赖）
 const UtilsModule = (function() {
     function showToast(msg, type) {
         const toast = document.getElementById('toast');

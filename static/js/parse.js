@@ -1,3 +1,5 @@
+// 协议解析模块
+// 依赖: AduCommon(adu-common.js)
 const ParseModule = (function() {
     let currentResult = null;
     const HISTORY_KEY = 'parse_history';

@@ -1,4 +1,5 @@
 // 网络配置模块
+// 依赖: socket(init传入)
 const NetworkModule = (function() {
     let networkConfigs = [];
     let currentConfigId = null;

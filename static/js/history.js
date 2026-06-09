@@ -1,4 +1,5 @@
 // 历史记录模块
+// 依赖: socket(init传入), AduCommon(adu-common.js), SceneModule(scene.js)
 const HistoryModule = (function() {
     let socket;
     let hasRealtimeUpdates = false;

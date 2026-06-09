@@ -1,3 +1,5 @@
+// 面板导航模块（编排器）
+// 依赖: NetworkModule, SignalInstanceModule, SendHistoryModule, ParseModule
 const PanelModule = (function() {
     let _skipHashSync = false;
 

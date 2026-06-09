@@ -1,4 +1,4 @@
-// 统计模块
+// 统计模块（无外部依赖）
 const StatsModule = (function() {
     function updateStats() {
         fetch('/api/stats').then(r => r.json()).then(data => {

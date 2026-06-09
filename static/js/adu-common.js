@@ -1,3 +1,4 @@
+// ADU解析展示工具（基础模块，无外部依赖）
 const AduCommon = (function() {
 
     const ADU_HEADER_LAYOUT = [
